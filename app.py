@@ -104,21 +104,25 @@ def bloque_contribuyente(nombre_empresa, rut_empresa):
 .bloque-sii {{
     font-family: Arial, sans-serif;
     color: #F4F7F8;
-    margin-top: 20px;
+    margin-top: 30px;
     margin-bottom: 30px;
+    padding: 15px 20px;
+    background-color: #0f172a;
+    border-radius: 8px;
+    max-width: 650px;
 }}
 .bloque-sii h2 {{
-    margin-bottom: 14px;
+    margin-bottom: 12px;
 }}
 .bloque-sii p {{
     margin-bottom: 14px;
 }}
 .bloque-sii table {{
     border-collapse: collapse;
-    font-size: 15px;
+    font-size: 14px;
 }}
 .bloque-sii td {{
-    padding: 3px 18px 3px 0;
+    padding: 4px 14px 4px 0;
 }}
 .bloque-sii .label {{
     font-weight: bold;
@@ -129,22 +133,10 @@ def bloque_contribuyente(nombre_empresa, rut_empresa):
     <h2>Detalle consulta declaración jurada</h2>
     <p>A continuación se despliega el detalle preparado para la Declaración Jurada <b>1879</b>.</p>
     <table>
-        <tr>
-            <td class="label">Nombre o Razón Social:</td>
-            <td>{nombre_empresa}</td>
-        </tr>
-        <tr>
-            <td class="label">RUT Empresa Declarante:</td>
-            <td>{rut_empresa}</td>
-        </tr>
-        <tr>
-            <td class="label">Año Tributario:</td>
-            <td>{ANIO_TRIBUTARIO}</td>
-        </tr>
-        <tr>
-            <td class="label">Año Comercial:</td>
-            <td>{ANIO_COMERCIAL}</td>
-        </tr>
+        <tr><td class="label">Nombre o Razón Social:</td><td>{nombre_empresa}</td></tr>
+        <tr><td class="label">RUT Empresa Declarante:</td><td>{rut_empresa}</td></tr>
+        <tr><td class="label">Año Tributario:</td><td>{ANIO_TRIBUTARIO}</td></tr>
+        <tr><td class="label">Año Comercial:</td><td>{ANIO_COMERCIAL}</td></tr>
     </table>
 </div>
 """
@@ -472,8 +464,10 @@ Debes subir los archivos de **Boletas de Honorarios Recibidas** descargados desd
 El sistema consolida los archivos, excluye documentos no vigentes, actualiza las retenciones, separa retenciones adicionales como el **3% préstamo tasa 0%**, y genera una tabla lista para revisión y descarga.
 """)
 
+st.markdown("### Paso 1: Sube los archivos mensuales")
+
 files = st.file_uploader(
-    "Paso 1: Sube los archivos mensuales de Boletas de Honorarios Recibidas",
+    "Archivos de Boletas de Honorarios Recibidas (SII)",
     accept_multiple_files=True,
     type=["xls", "html", "htm"],
 )
@@ -484,6 +478,9 @@ files = st.file_uploader(
 # =====================================================
 
 if files:
+
+    with st.expander("Ver archivos cargados"):
+        st.write([file.name for file in files])
 
     lista_df = []
     nombre_empresa = "No disponible"
@@ -622,7 +619,8 @@ if files:
             ],
         })
 
-        st.markdown("### Paso 2: Revisa los resultados y descarga tu DJ")
+        st.markdown("---")
+        st.markdown("## Paso 2: Revisa los resultados y descarga tu DJ")
         st.success("Archivos procesados correctamente.")
 
         st.markdown(
@@ -630,7 +628,7 @@ if files:
             unsafe_allow_html=True,
         )
 
-        st.subheader("Resumen final de la declaración")
+        st.markdown("## Resumen final de la declaración")
         st.markdown(
             tabla_html_resumen(
                 total_casos,
