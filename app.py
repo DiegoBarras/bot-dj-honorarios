@@ -250,8 +250,13 @@ def calcular_actualizaciones_sii(df_total):
         "Prestamo_3_Actualizado",
     ]]
 
-    df_calculo["Honorarios_Actualizado_Decimal"] = df_calculo["Honorarios_Actualizado_Decimal"].astype(str)
-    df_calculo["Prestamo_3_Actualizado_Decimal"] = df_calculo["Prestamo_3_Actualizado_Decimal"].astype(str)
+    df_calculo["Honorarios_Actualizado_Decimal"] = df_calculo[
+        "Honorarios_Actualizado_Decimal"
+    ].astype(str)
+
+    df_calculo["Prestamo_3_Actualizado_Decimal"] = df_calculo[
+        "Prestamo_3_Actualizado_Decimal"
+    ].astype(str)
 
     return df_calculo, df_actualizado
 
@@ -444,30 +449,33 @@ def tabla_html_dj(df_dj_lista):
 # =====================================================
 
 st.set_page_config(
-    page_title="BOT DJ Honorarios - D&D Contable",
+    page_title="D&D Tax Suite",
     layout="wide",
 )
 
-st.title("📊 BOT DJ Honorarios - D&D Contable")
+st.title("📊 D&D Tax Suite")
+st.subheader("Módulo: DJ 1879 Honorarios")
 
 st.markdown("""
-### ¿Qué hace este BOT?
+### ¿Qué hace esta herramienta?
 
-Este BOT permite preparar automáticamente la **Declaración Jurada 1879 de Honorarios** a partir de los archivos mensuales descargados desde el SII.
+Esta herramienta permite preparar automáticamente la **Declaración Jurada 1879 de Honorarios (SII)**, reduciendo errores y tiempos de procesamiento.
 
-**Debes subir:**  
-Los archivos mensuales de **Boletas de Honorarios Recibidas** descargados desde el portal del SII.
-
-**Ruta sugerida en SII:**  
+**Paso 1: Descarga los archivos desde el SII**  
+Ruta sugerida:  
 Servicios Online → Boletas de Honorarios Electrónicas → Receptor de Boletas → Informe mensual de boletas recibidas.
 
+**Paso 2: Sube los archivos mensuales**  
+Debes subir los archivos de **Boletas de Honorarios Recibidas** descargados desde el portal del SII.
+
+**Paso 3: Revisa y descarga tu DJ**  
 El sistema consolida los archivos, excluye documentos no vigentes, actualiza las retenciones, separa retenciones adicionales como el **3% préstamo tasa 0%**, y genera una tabla lista para revisión y descarga.
 """)
 
 files = st.file_uploader(
-    "Sube archivos de Boletas Honorarios Mensuales del SII",
+    "Paso 1: Sube los archivos mensuales de Boletas de Honorarios Recibidas",
     accept_multiple_files=True,
-    type=["xls", "html"],
+    type=["xls", "html", "htm"],
 )
 
 
@@ -540,6 +548,7 @@ if files:
 
         df_final["Rut_Orden"] = df_final["Rut"].apply(rut_a_numero)
         df_final = df_final.sort_values("Rut_Orden").drop(columns=["Rut_Orden"])
+        df_final = df_final.reset_index(drop=True)
 
         for num_mes, nombre_mes in meses_dict.items():
             df_final[nombre_mes] = df_final["Meses"].apply(
@@ -561,7 +570,7 @@ if files:
                 "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
                 "JUL", "AGO", "SEP", "OCT", "NOV", "DIC",
             ]
-        ].copy()
+        ].copy().reset_index(drop=True)
 
         df_dj_lista = df_final[
             [
@@ -572,7 +581,7 @@ if files:
                 "JUL", "AGO", "SEP", "OCT", "NOV", "DIC",
                 "Prestamo_3_Actualizado",
             ]
-        ].copy()
+        ].copy().reset_index(drop=True)
 
         df_dj_lista = df_dj_lista.rename(
             columns={
@@ -613,6 +622,7 @@ if files:
             ],
         })
 
+        st.markdown("### Paso 2: Revisa los resultados y descarga tu DJ")
         st.success("Archivos procesados correctamente.")
 
         st.markdown(
@@ -638,16 +648,24 @@ if files:
         )
 
         with st.expander("Ver resumen anual por RUT"):
-            st.dataframe(df_resumen_final, use_container_width=True)
+            st.dataframe(
+                df_resumen_final,
+                use_container_width=True,
+                hide_index=True,
+            )
 
         with st.expander("Ver detalle consolidado de boletas válidas"):
-            st.dataframe(df_total, use_container_width=True)
+            st.dataframe(
+                df_total.reset_index(drop=True),
+                use_container_width=True,
+                hide_index=True,
+            )
 
         excel_data = convertir_a_excel(
             df_dj_lista,
             df_cuadro_resumen,
             df_resumen_final,
-            df_total,
+            df_total.reset_index(drop=True),
         )
 
         st.download_button(
