@@ -2,7 +2,7 @@ import streamlit as st
 
 from app_1879 import run_1879
 from app_1835 import run_1835
-
+from app_1887 import run_1887
 
 # =====================================================
 # CONFIGURACIÓN GENERAL
@@ -176,6 +176,9 @@ with st.sidebar:
 
     if st.button("DJ 1835 · Arrendamientos", use_container_width=True):
         ir_a("1835")
+    
+    if st.button("DJ 1887 · Remuneraciones", use_container_width=True):
+        ir_a("1887")
 
     st.markdown("---")
     st.caption("Módulos futuros")
@@ -253,7 +256,7 @@ def mostrar_home():
     </div>
     """, unsafe_allow_html=True)
 
-    m1, m2, m3 = st.columns(3)
+    m1, m2, m3, m4 = st.columns(4)
 
     with m1:
         st.markdown("""
@@ -293,23 +296,25 @@ def mostrar_home():
     with m3:
         st.markdown("""
         <div class="module-card">
-            <p class="status-next">● Próximo módulo</p>
-            <h3>DJ Sueldos / Remuneraciones</h3>
+            <p class="status-ready">● Disponible</p>
+            <h3>DJ 1887 Remuneraciones</h3>
             <p>
-                Futuro asistente para declaraciones asociadas a remuneraciones, impuestos únicos y cuadraturas laborales.
+                Consolida los 12 archivos mensuales del Libro de Remuneraciones Electrónico,
+                valida meses faltantes y genera una salida tipo SII.
             </p>
             <p>
-                Diseñado para integrarse con planillas de remuneraciones y reportes contables.
+                Incluye resumen anual, detalle por trabajador y comparación opcional contra propuesta SII.
             </p>
         </div>
         """, unsafe_allow_html=True)
 
-        st.button("Próximamente", disabled=True, use_container_width=True)
+        if st.button("Abrir DJ 1887", use_container_width=True):
+            ir_a("1887")
 
-    st.markdown(
-        '<div class="section-title">Roadmap de producto</div>',
-        unsafe_allow_html=True
-    )
+        st.markdown(
+            '<div class="section-title">Roadmap de producto</div>',
+            unsafe_allow_html=True
+        )
 
     r1, r2, r3, r4 = st.columns(4)
 
@@ -366,3 +371,6 @@ elif st.session_state.modulo_activo == "1879":
 elif st.session_state.modulo_activo == "1835":
     st.button("← Volver al inicio", on_click=lambda: ir_a("home"))
     run_1835()
+elif st.session_state.modulo_activo == "1887":
+    st.button("← Volver al inicio", on_click=lambda: ir_a("home"))
+    run_1887()
