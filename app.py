@@ -302,10 +302,7 @@ def mostrar_home():
                 Automatiza la Declaración Jurada 1887, a partIr de los Libros de Remuneraciones Electrónico (LRE),
                 obten certificados de sueldos para tus trabajadores y  descarga el excel con la DJ lista para ser presentada en SII.
             </p>
-            <p>
-                Incluye resumen anual, detalle por trabajador y comparación opcional contra propuesta SII.
-            </p>
-        </div>
+                   </div>
         """, unsafe_allow_html=True)
 
         if st.button("Abrir DJ 1887", use_container_width=True):
