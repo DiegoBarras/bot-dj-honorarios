@@ -440,36 +440,32 @@ def tabla_html_dj(df_dj_lista):
 # 8. INTERFAZ WEB
 # =====================================================
 
-st.set_page_config(
-    page_title="D&D Tax Suite",
-    layout="wide",
-)
+def run_1879():
 
-st.title("📊 Asistente DJ 1879 - Honorarios")
-st.subheader("Automatiza la preparación de la DJ 1879 en minutos")
+    st.title("📊 Asistente DJ 1879 - Honorarios")
+    st.subheader("Automatiza la preparación de la DJ 1879 en minutos")
 
-st.markdown("""
+    st.markdown("""
+    Esta herramienta permite preparar automáticamente la **Declaración Jurada 1879 de Honorarios (SII)**, reduciendo errores y tiempos de procesamiento.
 
-Esta herramienta permite preparar automáticamente la **Declaración Jurada 1879 de Honorarios (SII)**, reduciendo errores y tiempos de procesamiento.
+    **Paso 1: Descarga los archivos desde el SII**
+    Ruta sugerida:
+    Servicios Online → Boletas de Honorarios Electrónicas → Receptor de Boletas → Informe mensual de boletas recibidas.
 
-**Paso 1: Descarga los archivos desde el SII**  
-Ruta sugerida:  
-Servicios Online → Boletas de Honorarios Electrónicas → Receptor de Boletas → Informe mensual de boletas recibidas.
+    **Paso 2: Sube los archivos mensuales**
+    Debes subir los archivos de **Boletas de Honorarios Recibidas** descargados desde el portal del SII.
 
-**Paso 2: Sube los archivos mensuales**  
-Debes subir los archivos de **Boletas de Honorarios Recibidas** descargados desde el portal del SII.
+    **Paso 3: Revisa y descarga tu DJ**
+    El sistema consolida los archivos, excluye documentos no vigentes, actualiza las retenciones y genera una tabla lista para revisión y descarga.
+    """)
 
-**Paso 3: Revisa y descarga tu DJ**  
-El sistema consolida los archivos, excluye documentos no vigentes, actualiza las retenciones, separa retenciones adicionales como el **3% préstamo tasa 0%**, y genera una tabla lista para revisión y descarga.
-""")
+    st.markdown("### Paso 1: Sube los archivos mensuales")
 
-st.markdown("### Paso 1: Sube los archivos mensuales")
-
-files = st.file_uploader(
-    "Archivos de Boletas de Honorarios Recibidas (SII)",
-    accept_multiple_files=True,
-    type=["xls", "html", "htm"],
-)
+    files = st.file_uploader(
+        "Archivos de Boletas de Honorarios Recibidas (SII)",
+        accept_multiple_files=True,
+        type=["xls", "html", "htm"]
+    )
 
 
 # =====================================================
