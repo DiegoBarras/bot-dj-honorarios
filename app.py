@@ -299,8 +299,8 @@ def mostrar_home():
             <p class="status-ready">● Disponible</p>
             <h3>DJ 1887 Remuneraciones</h3>
             <p>
-                Consolida los 12 archivos mensuales del Libro de Remuneraciones Electrónico,
-                valida meses faltantes y genera una salida tipo SII.
+                Automatiza la Declaración Jurada 1887, a partIr de los Libros de Remuneraciones Electrónico (LRE),
+                obten certificados de sueldos para tus trabajadores y  descarga el excel con la DJ lista para ser presentada en SII.
             </p>
             <p>
                 Incluye resumen anual, detalle por trabajador y comparación opcional contra propuesta SII.
