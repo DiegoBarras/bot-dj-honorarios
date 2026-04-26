@@ -590,6 +590,9 @@ def generar_resumen_1887(df_dj):
         "Remuneración Imponible Previsional Actualizada": df_dj["Remuneracion_Imponible_Prev_Actualizada"].sum(),
     }
 
+    for mes in MESES:
+        resumen[f"Ingreso Mensual {mes} Sin Actualizar"] = df_dj[f"Ingreso_{mes}"].sum()
+
     return pd.DataFrame({
         "Campo": list(resumen.keys()),
         "Monto": list(resumen.values()),
@@ -720,13 +723,36 @@ def convertir_a_excel_1887(df_dj, df_resumen, df_mensual, df_comparacion=None):
 def tabla_html_resumen_1887(df_resumen):
     data = {row["Campo"]: row["Monto"] for _, row in df_resumen.iterrows()}
 
+    total_casos = data.get("Total Casos Informados", 0)
+
+    renta_sin_actualizar = data.get("Renta Total Neta Pagada Sin Actualizar", 0)
+    iusc_sin_actualizar = data.get("IUSC Retenido Sin Actualizar", 0)
+    renta_no_gravada_sin_actualizar = data.get("Renta No Gravada Sin Actualizar", 0)
+    renta_exenta_sin_actualizar = data.get("Renta Exenta Sin Actualizar", 0)
+    rebaja_zona_sin_actualizar = data.get("Rebaja Zona Extrema Sin Actualizar", 0)
+    leyes_sociales = data.get("Leyes Sociales", 0)
+    prestamo_sin_actualizar = data.get("3% Préstamo Sin Actualizar", 0)
+    remuneracion_prev_actualizada = data.get("Remuneración Imponible Previsional Actualizada", 0)
+
+    renta_actualizada = data.get("Renta Total Neta Pagada Actualizada", 0)
+    iusc_actualizado = data.get("Impuesto Único Retenido Actualizado", 0)
+    mayor_retencion = data.get("Mayor Retención Solicitada Actualizada", 0)
+    renta_no_gravada = data.get("Renta Total No Gravada Actualizada", 0)
+    renta_exenta = data.get("Renta Total Exenta Actualizada", 0)
+    rebaja_zona = data.get("Rebaja Zonas Extremas Actualizada", 0)
+    prestamo_actualizado = data.get("3% Préstamo Tasa 0% Actualizado", 0)
+
+    ingresos_mensuales = {}
+    for mes in MESES:
+        ingresos_mensuales[mes] = data.get(f"Ingreso Mensual {mes} Sin Actualizar", 0)
+
     return f"""
 <style>
 .tabla-resumen {{
     width: 100%;
     border-collapse: collapse;
     font-family: Arial, sans-serif;
-    font-size: 13px;
+    font-size: 12px;
     margin-top: 10px;
     margin-bottom: 25px;
 }}
@@ -734,12 +760,13 @@ def tabla_html_resumen_1887(df_resumen):
     background-color: #073B53;
     color: white;
     border: 1px solid #D9E2E7;
-    padding: 8px;
+    padding: 7px;
     text-align: center;
+    vertical-align: middle;
 }}
 .tabla-resumen td {{
     border: 1px solid #D9E2E7;
-    padding: 8px;
+    padding: 7px;
     text-align: center;
     background-color: #FFFFFF;
     color: #1A1A1A;
@@ -756,29 +783,117 @@ def tabla_html_resumen_1887(df_resumen):
 </style>
 
 <table class="tabla-resumen">
+
 <tr>
-    <th colspan="8" class="seccion">Cuadro resumen final de la declaración</th>
+    <th colspan="9" class="seccion">TOTAL MONTOS ANUALES SIN ACTUALIZAR</th>
 </tr>
 <tr>
-    <th>Total Casos</th>
-    <th>Renta Total Neta</th>
-    <th>IUSC Retenido</th>
-    <th>Mayor Retención</th>
-    <th>Renta No Gravada</th>
-    <th>Renta Exenta</th>
-    <th>Rebaja Zona Extrema</th>
-    <th>3% Préstamo</th>
+    <th>Renta Total Neta Pagada</th>
+    <th>Impuesto Único Retenido</th>
+    <th>Impuesto Único Rentas Accesorias</th>
+    <th>Renta Total No Gravada</th>
+    <th>Renta Total Exenta</th>
+    <th>Rebaja Zonas Extremas</th>
+    <th>Leyes Sociales</th>
+    <th>3% Préstamo Tasa 0%</th>
+    <th>Remuneración Imponible Previsional Actualizada</th>
 </tr>
 <tr>
-    <td>{formato_monto(data.get("Total Casos Informados", 0))}</td>
-    <td class="monto">{formato_monto(data.get("Renta Total Neta Pagada Actualizada", 0))}</td>
-    <td class="monto">{formato_monto(data.get("Impuesto Único Retenido Actualizado", 0))}</td>
-    <td class="monto">{formato_monto(data.get("Mayor Retención Solicitada Actualizada", 0))}</td>
-    <td class="monto">{formato_monto(data.get("Renta Total No Gravada Actualizada", 0))}</td>
-    <td class="monto">{formato_monto(data.get("Renta Total Exenta Actualizada", 0))}</td>
-    <td class="monto">{formato_monto(data.get("Rebaja Zonas Extremas Actualizada", 0))}</td>
-    <td class="monto">{formato_monto(data.get("3% Préstamo Tasa 0% Actualizado", 0))}</td>
+    <td class="monto">{formato_monto(renta_sin_actualizar)}</td>
+    <td class="monto">{formato_monto(iusc_sin_actualizar)}</td>
+    <td class="monto">{formato_monto(0)}</td>
+    <td class="monto">{formato_monto(renta_no_gravada_sin_actualizar)}</td>
+    <td class="monto">{formato_monto(renta_exenta_sin_actualizar)}</td>
+    <td class="monto">{formato_monto(rebaja_zona_sin_actualizar)}</td>
+    <td class="monto">{formato_monto(leyes_sociales)}</td>
+    <td class="monto">{formato_monto(prestamo_sin_actualizar)}</td>
+    <td class="monto">{formato_monto(remuneracion_prev_actualizada)}</td>
 </tr>
+
+<tr>
+    <th colspan="12" class="seccion">TOTAL MONTO INGRESO MENSUAL (SIN ACTUALIZAR)</th>
+</tr>
+<tr>
+    <th>Enero</th>
+    <th>Febrero</th>
+    <th>Marzo</th>
+    <th>Abril</th>
+    <th>Mayo</th>
+    <th>Junio</th>
+    <th>Julio</th>
+    <th>Agosto</th>
+    <th>Septiembre</th>
+    <th>Octubre</th>
+    <th>Noviembre</th>
+    <th>Diciembre</th>
+</tr>
+<tr>
+    <td class="monto">{formato_monto(ingresos_mensuales["ENE"])}</td>
+    <td class="monto">{formato_monto(ingresos_mensuales["FEB"])}</td>
+    <td class="monto">{formato_monto(ingresos_mensuales["MAR"])}</td>
+    <td class="monto">{formato_monto(ingresos_mensuales["ABR"])}</td>
+    <td class="monto">{formato_monto(ingresos_mensuales["MAY"])}</td>
+    <td class="monto">{formato_monto(ingresos_mensuales["JUN"])}</td>
+    <td class="monto">{formato_monto(ingresos_mensuales["JUL"])}</td>
+    <td class="monto">{formato_monto(ingresos_mensuales["AGO"])}</td>
+    <td class="monto">{formato_monto(ingresos_mensuales["SEP"])}</td>
+    <td class="monto">{formato_monto(ingresos_mensuales["OCT"])}</td>
+    <td class="monto">{formato_monto(ingresos_mensuales["NOV"])}</td>
+    <td class="monto">{formato_monto(ingresos_mensuales["DIC"])}</td>
+</tr>
+
+<tr>
+    <th colspan="9" class="seccion">TOTAL MONTOS ANUALES ACTUALIZADOS</th>
+</tr>
+<tr>
+    <th>Total Casos Informados</th>
+    <th>Renta Total Neta Pagada</th>
+    <th>Impuesto Único Retenido</th>
+    <th>Mayor Retención Solicitada</th>
+    <th>Renta Total No Gravada</th>
+    <th>Renta Total Exenta</th>
+    <th>Rebaja Zonas Extremas</th>
+    <th>3% Préstamo Tasa 0%</th>
+    <th>Año 40 horas</th>
+</tr>
+<tr>
+    <td>{formato_monto(total_casos)}</td>
+    <td class="monto">{formato_monto(renta_actualizada)}</td>
+    <td class="monto">{formato_monto(iusc_actualizado)}</td>
+    <td class="monto">{formato_monto(mayor_retencion)}</td>
+    <td class="monto">{formato_monto(renta_no_gravada)}</td>
+    <td class="monto">{formato_monto(renta_exenta)}</td>
+    <td class="monto">{formato_monto(rebaja_zona)}</td>
+    <td class="monto">{formato_monto(prestamo_actualizado)}</td>
+    <td class="monto">{formato_monto(st.session_state.datos_declarante_1887.get("anio_40_horas", 2028))}</td>
+</tr>
+
+<tr>
+    <th colspan="9" class="seccion">MONTOS CALCULADOS</th>
+</tr>
+<tr>
+    <th>Total Casos Informados</th>
+    <th>Renta Total Neta Pagada</th>
+    <th>Impuesto Único Retenido</th>
+    <th>Mayor Retención Solicitada</th>
+    <th>Renta Total No Gravada</th>
+    <th>Renta Total Exenta</th>
+    <th>Rebaja Zonas Extremas</th>
+    <th>3% Préstamo Tasa 0%</th>
+    <th>Estado</th>
+</tr>
+<tr>
+    <td>{formato_monto(total_casos)}</td>
+    <td class="monto">{formato_monto(renta_actualizada)}</td>
+    <td class="monto">{formato_monto(iusc_actualizado)}</td>
+    <td class="monto">{formato_monto(mayor_retencion)}</td>
+    <td class="monto">{formato_monto(renta_no_gravada)}</td>
+    <td class="monto">{formato_monto(renta_exenta)}</td>
+    <td class="monto">{formato_monto(rebaja_zona)}</td>
+    <td class="monto">{formato_monto(prestamo_actualizado)}</td>
+    <td>Calculado</td>
+</tr>
+
 </table>
 """
 
@@ -895,6 +1010,12 @@ El objetivo es permitir al equipo contable comparar, revisar y respaldar la prop
 def pantalla_paso_1():
     st.title("Paso 1: Datos del declarante")
 
+    st.markdown("""
+Ingresa la información general de quien presentará la declaración.
+
+El año tributario será calculado automáticamente como el año siguiente al año comercial declarado.
+""")
+
     with st.form("form_declarante_1887"):
         col1, col2 = st.columns(2)
 
@@ -906,15 +1027,17 @@ def pantalla_paso_1():
         with col2:
             domicilio = st.text_input("Domicilio")
             comuna = st.text_input("Comuna")
-            telefono = st.text_input("Teléfono")
-            anio_comercial = st.number_input("Año Comercial", value=ANIO_COMERCIAL_DEFAULT, step=1)
-            anio_tributario = int(anio_comercial) + 1
-            st.caption(f"Año Tributario asociado: {anio_tributario}")
+            anio_comercial = st.number_input(
+                "Año Comercial",
+                value=ANIO_COMERCIAL_DEFAULT,
+                step=1,
+            )
 
-        anio_40_horas = st.number_input(
+        anio_40_horas = st.selectbox(
             "¿En qué año se acogerá plenamente a las 40 horas?",
-            value=2023,
-            step=1,
+            options=[2023, 2024, 2025, 2026, 2027, 2028],
+            index=5,
+            help="La reducción legal es gradual y alcanza 40 horas semanales en 2028. Si la empresa anticipó su implementación, selecciona el año correspondiente.",
         )
 
         guardar = st.form_submit_button("Guardar y continuar")
@@ -938,9 +1061,8 @@ def pantalla_paso_1():
                 "correo": correo.strip(),
                 "domicilio": domicilio.strip(),
                 "comuna": comuna.strip(),
-                "telefono": telefono.strip(),
                 "anio_comercial": int(anio_comercial),
-                "anio_tributario": int(anio_tributario),
+                "anio_tributario": int(anio_comercial) + 1,
                 "anio_40_horas": int(anio_40_horas),
             }
 
@@ -949,22 +1071,21 @@ def pantalla_paso_1():
 
 
 def pantalla_paso_2():
-    st.title("Paso 2: Carga de información")
+    st.title("Paso 2: Carga de Libros de Remuneraciones Electrónicos")
 
-    st.markdown("""
-### Opción principal: cargar los 12 archivos LRE
+    datos = st.session_state.datos_declarante_1887
+    anio_comercial = datos.get("anio_comercial", ANIO_COMERCIAL_DEFAULT)
 
-Carga los archivos mensuales del **Libro de Remuneraciones Electrónico**.  
-El sistema no permitirá avanzar si falta algún mes o si existe un mes duplicado.
+    st.markdown(f"""
+Carga los **12 archivos CSV del Libro de Remuneraciones Electrónico** correspondientes al año comercial **{anio_comercial}**.
 
-### Opción secundaria: carga manual acotada
-
-Quedará disponible en una versión posterior. La prioridad de este módulo es trabajar con archivos oficiales o estructurados generados por software de remuneraciones.
+El sistema validará que estén cargados todos los meses desde enero a diciembre.  
+Si falta un mes o existe un mes duplicado, no podrás generar la DJ 1887, porque la declaración anual quedaría incompleta.
 """)
 
     files = st.file_uploader(
-        "Sube los 12 archivos LRE del año comercial",
-        type=["csv", "txt", "xlsx"],
+        f"Sube los 12 archivos LRE CSV del año comercial {anio_comercial}",
+        type=["csv"],
         accept_multiple_files=True,
     )
 
@@ -973,11 +1094,12 @@ Quedará disponible en una versión posterior. La prioridad de este módulo es t
 
         with st.expander("Ver archivos cargados"):
             for file in files:
-                st.write(f"• {file.name}")
+                mes_detectado = detectar_mes_desde_nombre(file.name)
+                st.write(f"• {file.name} → Mes detectado: {mes_detectado if mes_detectado else 'No detectado'}")
 
-    if st.button("Validar LRE y continuar"):
+    if st.button("Validar LRE"):
         if not files:
-            st.error("Debes cargar los 12 archivos LRE.")
+            st.error("Debes cargar los 12 archivos LRE en formato CSV.")
             return
 
         try:
@@ -1000,7 +1122,6 @@ Quedará disponible en una versión posterior. La prioridad de este módulo es t
 
     if st.button("Volver al Paso 1"):
         ir_a_paso(1)
-
 
 def pantalla_paso_3():
     st.title("Paso 3: Generar DJ 1887")
