@@ -68,7 +68,6 @@ FACTORES_ACTUALIZACION = {
 COL_RUT = "Rut trabajador(1101)"
 COL_FECHA_TERMINO = "Fecha término de contrato(1103)"
 COL_JORNADA = "Código tipo de jornada(1107)"
-COL_DIAS_TRABAJADOS = "Nro días trabajados en el mes(1115)"
 
 COL_TOTAL_HABERES_IMP_TRIB = "Total haberes imponibles y tributables(5210)"
 COL_TOTAL_HABERES_IMP_NO_TRIB = "Total haberes imponibles no tributables(5220)"
@@ -81,10 +80,9 @@ COL_AFC_TRAB = "Cotización AFC - trabajador(3151)"
 COL_TRABAJO_PESADO_TRAB = "Cotización adicional trabajo pesado - trabajador(3154)"
 
 COL_IUSC = "Impuesto retenido por remuneraciones(3161)"
-COL_IUSC_INDEMNIZACIONES = "Impuesto retenido por indemnizaciones(3162)"
-COL_MAYOR_RETENCION = "Mayor retención de impuestos solicitada por el trabajador(3163)"
 COL_IUSC_RELIQ = "Impuesto retenido por reliquidación remun. devengadas otros períodos(3164)"
 COL_DIF_RELIQ = "Diferencia impuesto reliquidación remun. devengadas en este período(3165)"
+COL_MAYOR_RETENCION = "Mayor retención de impuestos solicitada por el trabajador(3163)"
 COL_PRESTAMO_3 = "Retención préstamo clase media 2020 (Ley 21.252) (3166)"
 COL_REBAJA_ZONA = "Rebaja zona extrema DL 889 (3167)"
 
@@ -93,7 +91,7 @@ COL_TOTAL_APORTES_EMPLEADOR = "Total aportes empleador(5410)"
 
 
 # =====================================================
-# 3. ESTADO DE SESIÓN
+# 3. SESSION STATE
 # =====================================================
 
 def inicializar_estado_1887():
@@ -179,15 +177,10 @@ def limpiar_monto(valor):
         return 0
 
 
-def obtener_columna(df, nombre_columna):
-    if nombre_columna in df.columns:
-        return nombre_columna
-    return None
-
-
 def obtener_serie_monto(df, nombre_columna):
     if nombre_columna in df.columns:
         return df[nombre_columna].apply(limpiar_monto)
+
     return pd.Series([0] * len(df), index=df.index)
 
 
@@ -204,12 +197,8 @@ def detectar_mes_desde_nombre(nombre_archivo):
 def leer_archivo_lre(file):
     nombre = file.name
 
-    if nombre.lower().endswith(".xlsx"):
-        df = pd.read_excel(file)
-        return df
-
     encodings = ["utf-8-sig", "latin1", "cp1252"]
-    separadores = [";", ",", "\t"]
+    separadores = [";"]
 
     ultimo_error = None
 
@@ -224,52 +213,6 @@ def leer_archivo_lre(file):
                 ultimo_error = e
 
     raise ValueError(f"No se pudo leer el archivo {nombre}. Error: {ultimo_error}")
-
-
-def crear_template_manual_1887():
-    columnas = [
-        "Rut_Trabajador",
-        "Monto_ENE",
-        "Monto_FEB",
-        "Monto_MAR",
-        "Monto_ABR",
-        "Monto_MAY",
-        "Monto_JUN",
-        "Monto_JUL",
-        "Monto_AGO",
-        "Monto_SEP",
-        "Monto_OCT",
-        "Monto_NOV",
-        "Monto_DIC",
-        "IUSC_ENE",
-        "IUSC_FEB",
-        "IUSC_MAR",
-        "IUSC_ABR",
-        "IUSC_MAY",
-        "IUSC_JUN",
-        "IUSC_JUL",
-        "IUSC_AGO",
-        "IUSC_SEP",
-        "IUSC_OCT",
-        "IUSC_NOV",
-        "IUSC_DIC",
-        "Mayor_Retencion_Anual",
-        "Renta_No_Gravada_Anual",
-        "Renta_Exenta_Anual",
-        "Rebaja_Zona_Extrema_Anual",
-        "Prestamo_3_Anual",
-        "Horas_Semanales",
-    ]
-
-    df = pd.DataFrame(columns=columnas)
-
-    output = BytesIO()
-
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Carga_Manual_1887")
-
-    output.seek(0)
-    return output.getvalue()
 
 
 # =====================================================
@@ -298,7 +241,7 @@ def cargar_lre_desde_archivos(files):
     meses_faltantes = [mes for mes in MESES if mes not in meses_unicos]
     meses_duplicados = sorted(
         [mes for mes in set(meses_detectados) if meses_detectados.count(mes) > 1],
-        key=lambda x: MESES.index(x)
+        key=lambda x: MESES.index(x),
     )
 
     if meses_faltantes:
@@ -384,42 +327,58 @@ def transformar_lre_mensual(df_lre):
     df["Factor"] = df["MES_DJ"].map(FACTORES_ACTUALIZACION)
 
     df["Renta_Total_Neta_Actualizada"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Renta_Total_Neta_Mensual"]))) * row["Factor"]),
+        lambda row: redondear_peso(
+            Decimal(str(int(row["Renta_Total_Neta_Mensual"]))) * row["Factor"]
+        ),
         axis=1,
     )
 
     df["IUSC_Actualizado"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["IUSC"] + row["IUSC_Reliquidacion"] + row["Diferencia_Reliquidacion"]))) * row["Factor"]),
+        lambda row: redondear_peso(
+            Decimal(str(int(row["IUSC"] + row["IUSC_Reliquidacion"] + row["Diferencia_Reliquidacion"]))) * row["Factor"]
+        ),
         axis=1,
     )
 
     df["Mayor_Retencion_Actualizada"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Mayor_Retencion"]))) * row["Factor"]),
+        lambda row: redondear_peso(
+            Decimal(str(int(row["Mayor_Retencion"]))) * row["Factor"]
+        ),
         axis=1,
     )
 
     df["Renta_No_Gravada_Actualizada"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Renta_No_Gravada_Mensual"]))) * row["Factor"]),
+        lambda row: redondear_peso(
+            Decimal(str(int(row["Renta_No_Gravada_Mensual"]))) * row["Factor"]
+        ),
         axis=1,
     )
 
     df["Renta_Exenta_Actualizada"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Renta_Exenta_Mensual"]))) * row["Factor"]),
+        lambda row: redondear_peso(
+            Decimal(str(int(row["Renta_Exenta_Mensual"]))) * row["Factor"]
+        ),
         axis=1,
     )
 
     df["Rebaja_Zona_Extrema_Actualizada"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Rebaja_Zona_Extrema"]))) * row["Factor"]),
+        lambda row: redondear_peso(
+            Decimal(str(int(row["Rebaja_Zona_Extrema"]))) * row["Factor"]
+        ),
         axis=1,
     )
 
     df["Prestamo_3_Actualizado"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Prestamo_3"]))) * row["Factor"]),
+        lambda row: redondear_peso(
+            Decimal(str(int(row["Prestamo_3"]))) * row["Factor"]
+        ),
         axis=1,
     )
 
     df["Remuneracion_Imponible_Prev_Actualizada"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Total_Haberes_Imp_Trib"]))) * row["Factor"]),
+        lambda row: redondear_peso(
+            Decimal(str(int(row["Total_Haberes_Imp_Trib"]))) * row["Factor"]
+        ),
         axis=1,
     )
 
@@ -506,7 +465,7 @@ def consolidar_dj_1887(df_mensual):
             index="Rut_Trabajador",
             columns="MES_DJ",
             values="Periodo_DJ",
-            aggfunc=lambda x: next((v for v in x if v != ""), "")
+            aggfunc=lambda x: next((v for v in x if v != ""), ""),
         )
         .reset_index()
     )
@@ -516,7 +475,7 @@ def consolidar_dj_1887(df_mensual):
             index="Rut_Trabajador",
             columns="MES_DJ",
             values="Monto_Ingreso_Mensual_Sin_Actualizar",
-            aggfunc="sum"
+            aggfunc="sum",
         )
         .reset_index()
     )
@@ -531,7 +490,11 @@ def consolidar_dj_1887(df_mensual):
     pivot_ingresos = pivot_ingresos.rename(columns={mes: f"Ingreso_{mes}" for mes in MESES})
 
     df_final = agrupado.merge(pivot_periodos[["Rut_Trabajador"] + MESES], on="Rut_Trabajador", how="left")
-    df_final = df_final.merge(pivot_ingresos[["Rut_Trabajador"] + [f"Ingreso_{mes}" for mes in MESES]], on="Rut_Trabajador", how="left")
+    df_final = df_final.merge(
+        pivot_ingresos[["Rut_Trabajador"] + [f"Ingreso_{mes}" for mes in MESES]],
+        on="Rut_Trabajador",
+        how="left",
+    )
 
     df_final["Rut_Orden"] = df_final["Rut_Trabajador"].apply(rut_a_numero)
     df_final = df_final.sort_values("Rut_Orden").drop(columns=["Rut_Orden"]).reset_index(drop=True)
@@ -606,95 +569,19 @@ def generar_resumen_1887(df_dj):
 def leer_resultado_sii(file):
     xls = pd.ExcelFile(file)
 
-    if "DETALLE" not in xls.sheet_names:
-        raise ValueError("El archivo SII debe contener una hoja llamada DETALLE.")
-
-    df = pd.read_excel(file, sheet_name="DETALLE", header=1)
+    hoja = xls.sheet_names[0]
+    df = pd.read_excel(file, sheet_name=hoja, header=0)
     df = df.dropna(how="all").copy()
 
-    col_num = "Unnamed: 1"
-    col_dv = "Unnamed: 3"
-
-    if col_num not in df.columns or col_dv not in df.columns:
-        raise ValueError("No pude identificar las columnas de RUT en el archivo SII.")
-
-    df = df[pd.to_numeric(df[col_num], errors="coerce").notna()].copy()
-
-    df["Rut_Trabajador"] = df.apply(
-        lambda row: f"{int(row[col_num])}-{str(row[col_dv]).strip().upper()}",
-        axis=1,
-    )
-
-    columnas = {
-        "Renta_Total_Neta_Actualizada_SII": "Renta Total Neta Pagada (Art.42 N°1, LIR)",
-        "IUSC_Actualizado_SII": "Impuesto Único de Segunda Categoría Retenido",
-        "Mayor_Retencion_Actualizada_SII": "Mayor Retención Solicitada (Art.88 L.I.R)",
-        "Renta_No_Gravada_Actualizada_SII": "Renta Total No Gravada",
-        "Renta_Exenta_Actualizada_SII": "Renta Total Exenta",
-        "Rebaja_Zona_Extrema_Actualizada_SII": "Rebajas Por Zonas Extremas (FRANQUICIA D.L. 889)",
-        "Prestamo_3_Actualizado_SII": "3% PRÉSTAMO TASA 0% AÑO 2021",
-    }
-
-    salida = df[["Rut_Trabajador"]].copy()
-
-    for nuevo, original in columnas.items():
-        if original in df.columns:
-            salida[nuevo] = df[original].apply(limpiar_monto)
-        else:
-            salida[nuevo] = 0
-
-    for mes, nombre_mes in MESES_NOMBRE.items():
-        if nombre_mes in df.columns:
-            salida[f"Ingreso_{mes}_SII"] = df[nombre_mes].apply(limpiar_monto)
-        else:
-            salida[f"Ingreso_{mes}_SII"] = 0
-
-        if mes in df.columns:
-            salida[f"Periodo_{mes}_SII"] = df[mes].fillna("").astype(str).str.strip()
-        else:
-            salida[f"Periodo_{mes}_SII"] = ""
-
-    return salida
+    return df
 
 
 def comparar_con_sii(df_dj, df_sii):
-    df = df_dj.merge(df_sii, on="Rut_Trabajador", how="outer", indicator=True)
-
-    pares = [
-        ("Renta_Total_Neta_Actualizada", "Renta_Total_Neta_Actualizada_SII"),
-        ("IUSC_Actualizado", "IUSC_Actualizado_SII"),
-        ("Mayor_Retencion_Actualizada", "Mayor_Retencion_Actualizada_SII"),
-        ("Renta_No_Gravada_Actualizada", "Renta_No_Gravada_Actualizada_SII"),
-        ("Renta_Exenta_Actualizada", "Renta_Exenta_Actualizada_SII"),
-        ("Rebaja_Zona_Extrema_Actualizada", "Rebaja_Zona_Extrema_Actualizada_SII"),
-        ("Prestamo_3_Actualizado", "Prestamo_3_Actualizado_SII"),
-    ]
-
-    for col_bot, col_sii in pares:
-        if col_bot not in df.columns:
-            df[col_bot] = 0
-        if col_sii not in df.columns:
-            df[col_sii] = 0
-
-        df[f"DIF_{col_bot}"] = df[col_bot].fillna(0).astype(int) - df[col_sii].fillna(0).astype(int)
-
-    for mes in MESES:
-        col_bot = f"Ingreso_{mes}"
-        col_sii = f"Ingreso_{mes}_SII"
-
-        if col_bot not in df.columns:
-            df[col_bot] = 0
-        if col_sii not in df.columns:
-            df[col_sii] = 0
-
-        df[f"DIF_Ingreso_{mes}"] = df[col_bot].fillna(0).astype(int) - df[col_sii].fillna(0).astype(int)
-
-    columnas_salida = [
-        "Rut_Trabajador",
-        "_merge",
-    ] + [f"DIF_{col_bot}" for col_bot, _ in pares] + [f"DIF_Ingreso_{mes}" for mes in MESES]
-
-    return df[columnas_salida].copy()
+    return pd.DataFrame({
+        "Mensaje": [
+            "Comparador SII cargado. En la siguiente versión se mapearán automáticamente los encabezados largos del SII contra el cálculo D&D."
+        ]
+    })
 
 
 # =====================================================
@@ -745,6 +632,8 @@ def tabla_html_resumen_1887(df_resumen):
     ingresos_mensuales = {}
     for mes in MESES:
         ingresos_mensuales[mes] = data.get(f"Ingreso Mensual {mes} Sin Actualizar", 0)
+
+    anio_40_horas = st.session_state.datos_declarante_1887.get("anio_40_horas", 2028)
 
     return f"""
 <style>
@@ -865,7 +754,7 @@ def tabla_html_resumen_1887(df_resumen):
     <td class="monto">{formato_monto(renta_exenta)}</td>
     <td class="monto">{formato_monto(rebaja_zona)}</td>
     <td class="monto">{formato_monto(prestamo_actualizado)}</td>
-    <td class="monto">{formato_monto(st.session_state.datos_declarante_1887.get("anio_40_horas", 2028))}</td>
+    <td class="monto">{formato_monto(anio_40_horas)}</td>
 </tr>
 
 <tr>
@@ -1035,9 +924,9 @@ El año tributario será calculado automáticamente como el año siguiente al a�
 
         anio_40_horas = st.selectbox(
             "¿En qué año se acogerá plenamente a las 40 horas?",
-            options=[2023, 2024, 2025, 2026, 2027, 2028],
-            index=5,
-            help="La reducción legal es gradual y alcanza 40 horas semanales en 2028. Si la empresa anticipó su implementación, selecciona el año correspondiente.",
+            options=[2024, 2025, 2026, 2027, 2028],
+            index=4,
+            help="Selecciona el año en que la empresa quedará plenamente acogida a la jornada de 40 horas.",
         )
 
         guardar = st.form_submit_button("Guardar y continuar")
@@ -1123,6 +1012,7 @@ Si falta un mes o existe un mes duplicado, no podrás generar la DJ 1887, porque
     if st.button("Volver al Paso 1"):
         ir_a_paso(1)
 
+
 def pantalla_paso_3():
     st.title("Paso 3: Generar DJ 1887")
 
@@ -1175,7 +1065,7 @@ def pantalla_paso_3():
             df_comparacion = comparar_con_sii(df_dj, df_sii)
             st.session_state.df_comparacion_sii_1887 = df_comparacion
 
-            st.success("Comparación contra SII generada correctamente.")
+            st.success("Archivo SII cargado correctamente.")
 
             with st.expander("Ver comparación contra SII"):
                 st.dataframe(
