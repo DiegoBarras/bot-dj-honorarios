@@ -55,28 +55,25 @@ COLUMNAS_BASE = [
 
 
 # =====================================================
-# 2. ESTADO DE SESIÓN
+# 2. FUNCIONES AUXILIARES
 # =====================================================
 
-if "paso_actual_1835" not in st.session_state:
-    st.session_state.paso_actual_1835 = 0
+def inicializar_estado_1835():
+    if "paso_actual_1835" not in st.session_state:
+        st.session_state.paso_actual_1835 = 0
 
-if "datos_declarante_1835" not in st.session_state:
-    st.session_state.datos_declarante_1835 = {}
+    if "datos_declarante_1835" not in st.session_state:
+        st.session_state.datos_declarante_1835 = {}
 
-if "df_base_1835" not in st.session_state:
-    st.session_state.df_base_1835 = None
+    if "df_base_1835" not in st.session_state:
+        st.session_state.df_base_1835 = None
 
-if "df_dj_1835" not in st.session_state:
-    st.session_state.df_dj_1835 = None
+    if "df_dj_1835" not in st.session_state:
+        st.session_state.df_dj_1835 = None
 
-if "df_resumen_1835" not in st.session_state:
-    st.session_state.df_resumen_1835 = None
+    if "df_resumen_1835" not in st.session_state:
+        st.session_state.df_resumen_1835 = None
 
-
-# =====================================================
-# 3. FUNCIONES AUXILIARES
-# =====================================================
 
 def ir_a_paso(paso):
     st.session_state.paso_actual_1835 = paso
@@ -151,7 +148,7 @@ def crear_template_excel():
 
 
 # =====================================================
-# 4. PROCESAMIENTO DJ 1835
+# 3. PROCESAMIENTO DJ 1835
 # =====================================================
 
 def preparar_dataframe_base(df_input):
@@ -162,13 +159,11 @@ def preparar_dataframe_base(df_input):
             df[col] = ""
 
     df = df[COLUMNAS_BASE].copy()
-
     df = df.dropna(how="all").copy()
 
     for col in COLUMNAS_BASE:
-        if col.startswith("Monto_"):
-            continue
-        df[col] = df[col].fillna("").astype(str).str.strip()
+        if not col.startswith("Monto_"):
+            df[col] = df[col].fillna("").astype(str).str.strip()
 
     for col in [f"Monto_{mes}" for mes in MESES]:
         df[col] = df[col].apply(limpiar_monto)
@@ -312,7 +307,7 @@ def convertir_a_excel(df_dj, df_resumen, df_base):
 
 
 # =====================================================
-# 5. HTML
+# 4. HTML SII
 # =====================================================
 
 def tabla_html_resumen_1835(total_casos, total_monto_arriendo):
@@ -463,26 +458,26 @@ def tabla_html_dj_1835(df_dj):
 
 
 # =====================================================
-# 6. PANTALLAS
+# 5. PANTALLAS
 # =====================================================
 
 def pantalla_bienvenida():
     st.title("🏢 Asistente DJ 1835 - Bienes Raíces Arrendados")
 
     st.markdown("""
-    ### Automatiza la preparación de la DJ 1835 en minutos
+### Automatiza la preparación de la DJ 1835 en minutos
 
-    Esta herramienta permite preparar la **Declaración Jurada 1835 sobre Bienes Raíces Arrendados**, consolidando la información de inmuebles, arrendadores, períodos de arriendo y montos mensuales pagados o devengados.
+Esta herramienta permite preparar la **Declaración Jurada 1835 sobre Bienes Raíces Arrendados**, consolidando la información de inmuebles, arrendadores, períodos de arriendo y montos mensuales pagados o devengados.
 
-    El asistente te guiará paso a paso para:
+El asistente te guiará paso a paso para:
 
-    1. Registrar los datos del declarante.  
-    2. Cargar la información de los bienes raíces arrendados.  
-    3. Validar los datos y generar el resumen final estilo SII.  
-    4. Descargar un Excel listo para revisión y respaldo.
+1. Registrar los datos del declarante.  
+2. Cargar la información de los bienes raíces arrendados.  
+3. Validar los datos y generar el resumen final estilo SII.  
+4. Descargar un Excel listo para revisión y respaldo.
 
-    Para utilizar este módulo, debes tener a mano los contratos de arriendo, información del rol del bien raíz, comuna, RUT del arrendador y los pagos mensuales del año comercial.
-    """)
+Para utilizar este módulo, debes tener a mano los contratos de arriendo, información del rol del bien raíz, comuna, RUT del arrendador y los pagos mensuales del año comercial.
+""")
 
     if st.button("Comenzar"):
         ir_a_paso(1)
@@ -492,10 +487,10 @@ def pantalla_paso_1():
     st.title("Paso 1: Datos del declarante")
 
     st.markdown("""
-    Ingresa la información general de quien presentará la declaración.
+Ingresa la información general de quien presentará la declaración.
 
-    El **Año Tributario** se calcula automáticamente como el año siguiente al **Año Comercial**, ya que esta declaración informa rentas del año comercial anterior.
-    """)
+El **Año Tributario** será calculado automáticamente como el año siguiente al **Año Comercial**.
+""")
 
     with st.form("form_declarante_1835"):
         col1, col2 = st.columns(2)
@@ -512,7 +507,7 @@ def pantalla_paso_1():
             )
 
             anio_tributario = int(anio_comercial) + 1
-            
+            st.caption(f"Año Tributario asociado: {anio_tributario}")
 
         tipo_declarante = st.selectbox(
             "Tipo de declarante",
@@ -561,33 +556,33 @@ def pantalla_selector_carga():
     st.title("Paso 2: Método de carga de bienes raíces arrendados")
 
     st.markdown("""
-    En este paso debes cargar la información de los bienes raíces arrendados durante el año comercial.
+En este paso debes cargar la información de los bienes raíces arrendados durante el año comercial.
 
-    Puedes elegir una de dos formas de trabajo:
-    """)
+Puedes elegir una de dos formas de trabajo:
+""")
 
     col1, col2 = st.columns(2)
 
     with col1:
         st.markdown("""
-        ### Opción A: Carga masiva Excel
+### Opción A: Carga masiva Excel
 
-        Recomendada cuando tienes varios inmuebles o trabajas como estudio contable.
+Recomendada cuando tienes varios inmuebles o trabajas como estudio contable.
 
-        Descarga una plantilla, complétala con la información de cada bien raíz y vuelve a subirla al sistema.
-        """)
+Descarga una plantilla, complétala con la información de cada bien raíz y vuelve a subirla al sistema.
+""")
 
         if st.button("Usar carga Excel"):
             ir_a_paso("2A")
 
     with col2:
         st.markdown("""
-        ### Opción B: Carga manual
+### Opción B: Carga manual
 
-        Recomendada cuando tienes pocos inmuebles o quieres ingresar la información directamente en pantalla.
+Recomendada cuando tienes pocos inmuebles o quieres ingresar la información directamente en pantalla.
 
-        El sistema abrirá una tabla editable para completar cada bien raíz arrendado.
-        """)
+El sistema abrirá una tabla editable para completar cada bien raíz arrendado.
+""")
 
         if st.button("Usar carga manual"):
             ir_a_paso("2B")
@@ -633,29 +628,27 @@ def procesar_y_validar_paso_2(df_editado):
 def pantalla_carga_excel():
     st.title("Paso 2A: Carga masiva mediante Excel")
 
-    # 🔹 Descripción simple (UX limpia)
     st.markdown("""
 Descarga la plantilla, completa una fila por cada bien raíz arrendado y vuelve a subir el archivo.
 
 La plantilla permite cargar los datos del inmueble, RUT del arrendador y los montos mensuales de arriendo.
 """)
 
-    # 🔹 Guía colapsable (mejor UX)
-    with st.expander("Ver guía de llenado de la plantilla Excel"):
+    with st.expander("📘 Ver guía de llenado de la plantilla Excel"):
         st.markdown("""
 Completa **una fila por cada bien raíz arrendado**.
 
-### 📌 Campos principales
+### Campos principales
 
 | Campo | Cómo completarlo |
 |---|---|
 | Rol_Parte_1 / Rol_Parte_2 | Rol del bien raíz separado en dos partes. Ej: `61` y `328`. |
 | Codigo_Comuna / Comuna | Código y nombre de la comuna según SII. |
 | Rut_Arrendador | RUT de quien recibe la renta. |
-| Rut_Arrendatario | Solo si aplica (corredor/intermediario). |
-| Monto_ENE a Monto_DIC | Monto pagado en cada mes. Si no hubo pago, dejar vacío o 0. |
+| Rut_Arrendatario | Solo si aplica como corredor/intermediario. |
+| Monto_ENE a Monto_DIC | Monto pagado o devengado en cada mes. Si no hubo pago, dejar vacío o 0. |
 
-### 🔢 Códigos importantes
+### Códigos importantes
 
 | Campo | Código | Significado |
 |---|---:|---|
@@ -672,15 +665,14 @@ Completa **una fila por cada bien raíz arrendado**.
 | Naturaleza_Bien_Raiz | 1 | Agrícola |
 | Naturaleza_Bien_Raiz | 2 | No agrícola |
 
-### ⚠️ Reglas importantes
+### Reglas importantes
 
-- Ingresa los montos **exactos pagados cada mes**
-- Si un mes no tiene pago → dejar vacío o 0
-- No usar fórmulas en Excel (solo valores)
-- Revisar que los RUT estén correctamente escritos
+- Ingresa los montos **exactos pagados o devengados cada mes**.
+- Si un mes no tiene pago, dejar vacío o 0.
+- No usar fórmulas en Excel, solo valores.
+- Revisar que los RUT estén correctamente escritos.
 """)
 
-    # 🔹 Botón descarga plantilla
     template_excel = crear_template_excel()
 
     st.download_button(
@@ -690,31 +682,25 @@ Completa **una fila por cada bien raíz arrendado**.
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
-    # 🔹 Upload archivo
     archivo_excel = st.file_uploader(
         "Sube la plantilla Excel completada",
-        type=["xlsx"]
+        type=["xlsx"],
     )
 
-    # 🔹 Procesamiento
     if archivo_excel:
         df_input = pd.read_excel(archivo_excel)
 
-        st.markdown("### 🔍 Revisión de información cargada")
+        st.markdown("### Revisión de información cargada")
 
         df_editado = st.data_editor(
             df_input,
             use_container_width=True,
-            num_rows="dynamic"
+            num_rows="dynamic",
+            hide_index=True,
         )
 
-        if st.button("Cargar Paso 2"):
-            try:
-                st.session_state.df_1835 = df_editado
-                st.success("Paso 2 cargado correctamente")
-                ir_a_paso(3)
-            except Exception as e:
-                st.error(f"Error en la carga: {e}")
+        if st.button("Validar y continuar"):
+            procesar_y_validar_paso_2(df_editado)
 
     st.divider()
 
@@ -728,14 +714,15 @@ Completa **una fila por cada bien raíz arrendado**.
         if st.button("⬅️ Volver al Paso 1"):
             ir_a_paso(1)
 
+
 def pantalla_carga_manual():
     st.title("Paso 2B: Carga manual en pantalla")
 
     st.markdown("""
-    Ingresa directamente la información de cada bien raíz arrendado.
+Ingresa directamente la información de cada bien raíz arrendado.
 
-    Cada fila corresponde a un inmueble o registro informado en la DJ. Puedes agregar nuevas filas desde la tabla.
-    """)
+Cada fila corresponde a un inmueble o registro informado en la DJ. Puedes agregar nuevas filas desde la tabla.
+""")
 
     df_input = crear_dataframe_vacio()
 
@@ -749,16 +736,16 @@ def pantalla_carga_manual():
     if st.button("Validar y continuar"):
         procesar_y_validar_paso_2(df_editado)
 
-    st.markdown("---")
+    st.divider()
 
     col1, col2 = st.columns(2)
 
     with col1:
-        if st.button("Volver a elegir método"):
+        if st.button("⬅️ Volver a elegir método"):
             ir_a_paso(2)
 
     with col2:
-        if st.button("Volver al Paso 1"):
+        if st.button("⬅️ Volver al Paso 1"):
             ir_a_paso(1)
 
 
@@ -769,10 +756,10 @@ def pantalla_paso_3():
     df_base = st.session_state.df_base_1835.copy()
 
     st.markdown("""
-    La información ya fue cargada y validada.
+La información ya fue cargada y validada.
 
-    Ahora puedes generar el resumen final de la Declaración Jurada 1835 y descargar el archivo Excel de respaldo.
-    """)
+Ahora puedes generar el resumen final de la Declaración Jurada 1835 y descargar el archivo Excel de respaldo.
+""")
 
     if st.button("Generar DJ 1835"):
         df_dj = generar_dj_1835(
@@ -809,11 +796,11 @@ def pantalla_paso_3():
         st.markdown("## Detalle consulta declaración jurada")
 
         st.markdown(f"""
-        **Nombre o Razón Social:** {datos_declarante["nombre_declarante"]}  
-        **RUT Empresa Declarante:** {datos_declarante["rut_declarante"]}  
-        **Año Tributario:** {datos_declarante["anio_tributario"]}  
-        **Año Comercial:** {datos_declarante["anio_comercial"]}
-        """)
+**Nombre o Razón Social:** {datos_declarante["nombre_declarante"]}  
+**RUT Empresa Declarante:** {datos_declarante["rut_declarante"]}  
+**Año Tributario:** {datos_declarante["anio_tributario"]}  
+**Año Comercial:** {datos_declarante["anio_comercial"]}
+""")
 
         st.markdown("## Resumen final de la declaración")
         st.markdown(
@@ -843,12 +830,12 @@ def pantalla_paso_3():
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
-    st.markdown("---")
+    st.divider()
 
     col1, col2 = st.columns(2)
 
     with col1:
-        if st.button("Volver al Paso 2"):
+        if st.button("⬅️ Volver al Paso 2"):
             ir_a_paso(2)
 
     with col2:
@@ -862,26 +849,11 @@ def pantalla_paso_3():
 
 
 # =====================================================
-# 7. ROUTER PRINCIPAL
+# 6. FUNCIÓN PRINCIPAL DEL MÓDULO
 # =====================================================
 
-
 def run_1835():
-
-    if "paso_actual_1835" not in st.session_state:
-        st.session_state.paso_actual_1835 = 0
-
-    if "datos_declarante_1835" not in st.session_state:
-        st.session_state.datos_declarante_1835 = {}
-
-    if "df_base_1835" not in st.session_state:
-        st.session_state.df_base_1835 = None
-
-    if "df_dj_1835" not in st.session_state:
-        st.session_state.df_dj_1835 = None
-
-    if "df_resumen_1835" not in st.session_state:
-        st.session_state.df_resumen_1835 = None
+    inicializar_estado_1835()
 
     paso = st.session_state.paso_actual_1835
 
