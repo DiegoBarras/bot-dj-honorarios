@@ -865,27 +865,24 @@ def pantalla_paso_3():
 # 7. ROUTER PRINCIPAL
 # =====================================================
 
-st.set_page_config(
-    page_title="D&D Tax Suite - DJ 1835",
-    layout="wide",
-)
 
-paso = st.session_state.paso_actual_1835
+def run_1835():
+    paso = st.session_state.paso_actual_1835
 
-if paso == 0:
-    pantalla_bienvenida()
+    if paso == 0:
+        pantalla_bienvenida()
 
-elif paso == 1:
-    pantalla_paso_1()
+    elif paso == 1:
+        pantalla_paso_1()
 
-elif paso == 2:
-    pantalla_selector_carga()
+    elif paso == 2:
+        pantalla_selector_carga()
 
-elif paso == "2A":
-    pantalla_carga_excel()
+    elif paso == "2A":
+        pantalla_carga_excel()
 
-elif paso == "2B":
-    pantalla_carga_manual()
+    elif paso == "2B":
+        pantalla_carga_manual()
 
-elif paso == 3:
-    pantalla_paso_3()
+    elif paso == 3:
+        pantalla_paso_3()
