@@ -472,28 +472,28 @@ def run_1879():
 # 9. PROCESAMIENTO PRINCIPAL
 # =====================================================
 
-if files:
-
-    with st.expander("Ver archivos cargados"):
-        st.write([file.name for file in files])
-
-    lista_df = []
-    nombre_empresa = "No disponible"
-    rut_empresa = "No disponible"
-
-    for file in files:
-        try:
-            df_mes, nombre_detectado, rut_detectado = procesar_archivo(file)
-            lista_df.append(df_mes)
-
-            if nombre_detectado != "No disponible":
-                nombre_empresa = nombre_detectado
-
-            if rut_detectado != "No disponible":
-                rut_empresa = rut_detectado
-
-        except Exception as e:
-            st.error(f"Error procesando el archivo {file.name}: {e}")
+    if files:
+    
+        with st.expander("Ver archivos cargados"):
+            st.write([file.name for file in files])
+    
+        lista_df = []
+        nombre_empresa = "No disponible"
+        rut_empresa = "No disponible"
+    
+        for file in files:
+            try:
+                df_mes, nombre_detectado, rut_detectado = procesar_archivo(file)
+                lista_df.append(df_mes)
+    
+                if nombre_detectado != "No disponible":
+                    nombre_empresa = nombre_detectado
+    
+                if rut_detectado != "No disponible":
+                    rut_empresa = rut_detectado
+    
+            except Exception as e:
+                st.error(f"Error procesando el archivo {file.name}: {e}")
 
     if lista_df:
 
