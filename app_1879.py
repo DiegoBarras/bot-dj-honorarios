@@ -467,203 +467,203 @@ def run_1879():
         type=["xls", "html", "htm"]
     )
 
-
+    lista_df = []
 # =====================================================
 # 9. PROCESAMIENTO PRINCIPAL
 # =====================================================
 
     if files:
-    
+
         with st.expander("Ver archivos cargados"):
             st.write([file.name for file in files])
-    
+
         lista_df = []
         nombre_empresa = "No disponible"
         rut_empresa = "No disponible"
-    
+
         for file in files:
             try:
                 df_mes, nombre_detectado, rut_detectado = procesar_archivo(file)
                 lista_df.append(df_mes)
-    
+
                 if nombre_detectado != "No disponible":
                     nombre_empresa = nombre_detectado
-    
+
                 if rut_detectado != "No disponible":
                     rut_empresa = rut_detectado
-    
+
             except Exception as e:
                 st.error(f"Error procesando el archivo {file.name}: {e}")
 
-    if lista_df:
+        if lista_df:
 
-        df_total = pd.concat(lista_df, ignore_index=True)
+            df_total = pd.concat(lista_df, ignore_index=True)
 
-        df_calculo_retenciones, df_actualizado = calcular_actualizaciones_sii(df_total)
+            df_calculo_retenciones, df_actualizado = calcular_actualizaciones_sii(df_total)
 
-        df_base = (
-            df_calculo_retenciones
-            .groupby("Rut")[[
-                "Brutos",
-                "Retenido",
-                "Pagado",
-                "Retenido_Honorarios",
-                "Retenido_Prestamo_3"
-            ]]
-            .sum()
-            .reset_index()
-        )
-
-        df_resumen = df_base.merge(df_actualizado, on="Rut", how="left")
-
-        df_nombres = (
-            df_total[["Rut", "Nombre o Razón Social"]]
-            .drop_duplicates(subset=["Rut"])
-            .copy()
-        )
-
-        df_meses = (
-            df_total
-            .groupby("Rut")["Mes"]
-            .apply(lambda x: sorted(x.dropna().unique().tolist()))
-            .reset_index()
-            .rename(columns={"Mes": "Meses"})
-        )
-
-        df_final = df_resumen.merge(df_nombres, on="Rut", how="left")
-        df_final = df_final.merge(df_meses, on="Rut", how="left")
-
-        df_final = df_final[
-            (df_final["Retenido_Honorarios"] > 0) |
-            (df_final["Retenido_Prestamo_3"] > 0)
-        ].copy()
-
-        df_final["Rut_Orden"] = df_final["Rut"].apply(rut_a_numero)
-        df_final = df_final.sort_values("Rut_Orden").drop(columns=["Rut_Orden"])
-        df_final = df_final.reset_index(drop=True)
-
-        for num_mes, nombre_mes in meses_dict.items():
-            df_final[nombre_mes] = df_final["Meses"].apply(
-                lambda lista: "X" if num_mes in lista else ""
+            df_base = (
+                df_calculo_retenciones
+                .groupby("Rut")[[
+                    "Brutos",
+                    "Retenido",
+                    "Pagado",
+                    "Retenido_Honorarios",
+                    "Retenido_Prestamo_3"
+                ]]
+                .sum()
+                .reset_index()
             )
 
-        df_resumen_final = df_final[
-            [
-                "Rut",
-                "Nombre o Razón Social",
-                "Brutos",
-                "Retenido",
-                "Retenido_Honorarios",
-                "Retenido_Prestamo_3",
-                "Honorarios_Actualizado",
-                "Prestamo_3_Actualizado",
-                "Pagado",
-                "Meses",
-                "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
-                "JUL", "AGO", "SEP", "OCT", "NOV", "DIC",
-            ]
-        ].copy().reset_index(drop=True)
+            df_resumen = df_base.merge(df_actualizado, on="Rut", how="left")
 
-        df_dj_lista = df_final[
-            [
-                "Rut",
-                "Nombre o Razón Social",
-                "Honorarios_Actualizado",
-                "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
-                "JUL", "AGO", "SEP", "OCT", "NOV", "DIC",
-                "Prestamo_3_Actualizado",
-            ]
-        ].copy().reset_index(drop=True)
+            df_nombres = (
+                df_total[["Rut", "Nombre o Razón Social"]]
+                .drop_duplicates(subset=["Rut"])
+                .copy()
+            )
 
-        df_dj_lista = df_dj_lista.rename(
-            columns={
-                "Honorarios_Actualizado": "Honorarios y Otros Art. 42 N°2 - Tasa 14,5%",
-                "Prestamo_3_Actualizado": "3% Préstamo tasa 0% año 2021",
-            }
-        )
+            df_meses = (
+                df_total
+                .groupby("Rut")["Mes"]
+                .apply(lambda x: sorted(x.dropna().unique().tolist()))
+                .reset_index()
+                .rename(columns={"Mes": "Meses"})
+            )
 
-        total_honorarios_actualizados = df_dj_lista[
-            "Honorarios y Otros Art. 42 N°2 - Tasa 14,5%"
-        ].sum()
+            df_final = df_resumen.merge(df_nombres, on="Rut", how="left")
+            df_final = df_final.merge(df_meses, on="Rut", how="left")
 
-        total_prestamo_3 = df_dj_lista[
-            "3% Préstamo tasa 0% año 2021"
-        ].sum()
+            df_final = df_final[
+                (df_final["Retenido_Honorarios"] > 0) |
+                (df_final["Retenido_Prestamo_3"] > 0)
+            ].copy()
 
-        total_honorarios_sin_actualizar = df_resumen_final["Brutos"].sum()
-        total_casos = df_dj_lista["Rut"].nunique()
+            df_final["Rut_Orden"] = df_final["Rut"].apply(rut_a_numero)
+            df_final = df_final.sort_values("Rut_Orden").drop(columns=["Rut_Orden"])
+            df_final = df_final.reset_index(drop=True)
 
-        df_cuadro_resumen = pd.DataFrame({
-            "Campo": [
-                "Honorarios y Otros Art. 42 N°2 - Tasa 14,5%",
-                "Remuneración Directores Art. 48 - Tasa 10%",
-                "Remuneración Directores Art. 48 - Tasa 35%",
-                "Monto pagado anual actualizado por servicios en Isla de Pascua",
-                "3% Préstamo tasa 0% año 2021",
-                "Monto total honorarios sin actualizar",
-                "Total casos informados",
-            ],
-            "Monto": [
-                total_honorarios_actualizados,
-                0,
-                0,
-                0,
-                total_prestamo_3,
-                total_honorarios_sin_actualizar,
-                total_casos,
-            ],
-        })
+            for num_mes, nombre_mes in meses_dict.items():
+                df_final[nombre_mes] = df_final["Meses"].apply(
+                    lambda lista: "X" if num_mes in lista else ""
+                )
 
-        st.markdown("---")
-        st.markdown("## Paso 2: Revisa los resultados y descarga tu DJ")
-        st.success("Archivos procesados correctamente.")
+            df_resumen_final = df_final[
+                [
+                    "Rut",
+                    "Nombre o Razón Social",
+                    "Brutos",
+                    "Retenido",
+                    "Retenido_Honorarios",
+                    "Retenido_Prestamo_3",
+                    "Honorarios_Actualizado",
+                    "Prestamo_3_Actualizado",
+                    "Pagado",
+                    "Meses",
+                    "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
+                    "JUL", "AGO", "SEP", "OCT", "NOV", "DIC",
+                ]
+            ].copy().reset_index(drop=True)
 
-        st.markdown(
-            bloque_contribuyente(nombre_empresa, rut_empresa),
-            unsafe_allow_html=True,
-        )
+            df_dj_lista = df_final[
+                [
+                    "Rut",
+                    "Nombre o Razón Social",
+                    "Honorarios_Actualizado",
+                    "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
+                    "JUL", "AGO", "SEP", "OCT", "NOV", "DIC",
+                    "Prestamo_3_Actualizado",
+                ]
+            ].copy().reset_index(drop=True)
 
-        st.markdown("## Resumen final de la declaración")
-        st.markdown(
-            tabla_html_resumen(
-                total_casos,
-                total_honorarios_actualizados,
-                total_prestamo_3,
-                total_honorarios_sin_actualizar,
-            ),
-            unsafe_allow_html=True,
-        )
+            df_dj_lista = df_dj_lista.rename(
+                columns={
+                    "Honorarios_Actualizado": "Honorarios y Otros Art. 42 N°2 - Tasa 14,5%",
+                    "Prestamo_3_Actualizado": "3% Préstamo tasa 0% año 2021",
+                }
+            )
 
-        st.subheader("Datos de los informados - DJ 1879 lista para declarar")
-        st.markdown(
-            tabla_html_dj(df_dj_lista),
-            unsafe_allow_html=True,
-        )
+            total_honorarios_actualizados = df_dj_lista[
+                "Honorarios y Otros Art. 42 N°2 - Tasa 14,5%"
+            ].sum()
 
-        with st.expander("Ver resumen anual por RUT"):
-            st.dataframe(
+            total_prestamo_3 = df_dj_lista[
+                "3% Préstamo tasa 0% año 2021"
+            ].sum()
+
+            total_honorarios_sin_actualizar = df_resumen_final["Brutos"].sum()
+            total_casos = df_dj_lista["Rut"].nunique()
+
+            df_cuadro_resumen = pd.DataFrame({
+                "Campo": [
+                    "Honorarios y Otros Art. 42 N°2 - Tasa 14,5%",
+                    "Remuneración Directores Art. 48 - Tasa 10%",
+                    "Remuneración Directores Art. 48 - Tasa 35%",
+                    "Monto pagado anual actualizado por servicios en Isla de Pascua",
+                    "3% Préstamo tasa 0% año 2021",
+                    "Monto total honorarios sin actualizar",
+                    "Total casos informados",
+                ],
+                "Monto": [
+                    total_honorarios_actualizados,
+                    0,
+                    0,
+                    0,
+                    total_prestamo_3,
+                    total_honorarios_sin_actualizar,
+                    total_casos,
+                ],
+            })
+
+            st.markdown("---")
+            st.markdown("## Paso 2: Revisa los resultados y descarga tu DJ")
+            st.success("Archivos procesados correctamente.")
+
+            st.markdown(
+                bloque_contribuyente(nombre_empresa, rut_empresa),
+                unsafe_allow_html=True,
+            )
+
+            st.markdown("## Resumen final de la declaración")
+            st.markdown(
+                tabla_html_resumen(
+                    total_casos,
+                    total_honorarios_actualizados,
+                    total_prestamo_3,
+                    total_honorarios_sin_actualizar,
+                ),
+                unsafe_allow_html=True,
+            )
+
+            st.subheader("Datos de los informados - DJ 1879 lista para declarar")
+            st.markdown(
+                tabla_html_dj(df_dj_lista),
+                unsafe_allow_html=True,
+            )
+
+            with st.expander("Ver resumen anual por RUT"):
+                st.dataframe(
+                    df_resumen_final,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+            with st.expander("Ver detalle consolidado de boletas válidas"):
+                st.dataframe(
+                    df_total.reset_index(drop=True),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+            excel_data = convertir_a_excel(
+                df_dj_lista,
+                df_cuadro_resumen,
                 df_resumen_final,
-                use_container_width=True,
-                hide_index=True,
-            )
-
-        with st.expander("Ver detalle consolidado de boletas válidas"):
-            st.dataframe(
                 df_total.reset_index(drop=True),
-                use_container_width=True,
-                hide_index=True,
             )
 
-        excel_data = convertir_a_excel(
-            df_dj_lista,
-            df_cuadro_resumen,
-            df_resumen_final,
-            df_total.reset_index(drop=True),
-        )
-
-        st.download_button(
-            label="📥 Descargar Excel completo",
-            data=excel_data,
-            file_name="DJ_1879_Honorarios_DD_Contable.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
+            st.download_button(
+                label="📥 Descargar Excel completo",
+                data=excel_data,
+                file_name="DJ_1879_Honorarios_DD_Contable.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
