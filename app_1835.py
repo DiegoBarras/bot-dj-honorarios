@@ -867,6 +867,22 @@ def pantalla_paso_3():
 
 
 def run_1835():
+
+    if "paso_actual_1835" not in st.session_state:
+        st.session_state.paso_actual_1835 = 0
+
+    if "datos_declarante_1835" not in st.session_state:
+        st.session_state.datos_declarante_1835 = {}
+
+    if "df_base_1835" not in st.session_state:
+        st.session_state.df_base_1835 = None
+
+    if "df_dj_1835" not in st.session_state:
+        st.session_state.df_dj_1835 = None
+
+    if "df_resumen_1835" not in st.session_state:
+        st.session_state.df_resumen_1835 = None
+
     paso = st.session_state.paso_actual_1835
 
     if paso == 0:
