@@ -130,15 +130,18 @@ def ir_a_paso(paso):
 # 4. FUNCIONES AUXILIARES
 # =====================================================
 
+def sii_round(valor):
+    try:
+        return int(Decimal(str(valor)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    except Exception:
+        return 0
+
+
 def formato_monto(valor):
     try:
         return f"{int(round(float(valor))):,}".replace(",", ".")
     except Exception:
         return "0"
-
-
-def redondear_peso(valor):
-    return int(Decimal(valor).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def normalizar_rut(rut):
@@ -335,18 +338,12 @@ def calcular_iusc_desde_base(base_pesos, mes):
                 return 0
 
             impuesto = base * tramo["factor"] - tramo["rebaja"] * utm
-            return max(redondear_peso(impuesto), 0)
+            return max(sii_round(impuesto), 0)
 
     return 0
 
 
 def inferir_renta_desde_iusc(iusc_mensual, mes):
-    """
-    Reconstruye la renta líquida imponible mensual desde el IUSC retenido.
-    Si el IUSC es 0, no existe una única base posible, por lo que se retorna None
-    y el motor usa la renta calculada desde LRE como fallback.
-    """
-
     impuesto = Decimal(str(int(iusc_mensual)))
 
     if impuesto <= 0:
@@ -367,7 +364,7 @@ def inferir_renta_desde_iusc(iusc_mensual, mes):
         hasta = tramo["hasta"] * utm if tramo["hasta"] is not None else None
 
         if base > desde and (hasta is None or base <= hasta):
-            return redondear_peso(base)
+            return sii_round(base)
 
     return None
 
@@ -414,9 +411,7 @@ def transformar_lre_mensual(df_lre):
 
     df["Renta_LRE_Fallback"] = (
         df["Total_Haberes_Imp_Trib"] - df["Cotizaciones_Deducibles_Renta_Neta"]
-    )
-
-    df["Renta_LRE_Fallback"] = df["Renta_LRE_Fallback"].apply(lambda x: max(int(x), 0))
+    ).apply(lambda x: max(int(x), 0))
 
     df["IUSC_Total_Mensual"] = (
         df["IUSC"]
@@ -437,6 +432,9 @@ def transformar_lre_mensual(df_lre):
         axis=1,
     )
 
+    # Redondeo SII a nivel trabajador-mes antes de cualquier agrupación.
+    df["Renta_Total_Neta_Mensual"] = df["Renta_Total_Neta_Mensual"].apply(sii_round)
+
     df["Metodo_Renta"] = df.apply(
         lambda row: "Inferida desde IUSC"
         if pd.notna(row["Renta_Inferida_IUSC"]) and row["Renta_Inferida_IUSC"] is not None
@@ -444,56 +442,58 @@ def transformar_lre_mensual(df_lre):
         axis=1,
     )
 
-    df["Renta_No_Gravada_Mensual"] = df["Haberes_Imp_No_Trib"] + df["Haberes_No_Imp_No_Trib"]
+    df["Renta_No_Gravada_Mensual"] = (
+        df["Haberes_Imp_No_Trib"] + df["Haberes_No_Imp_No_Trib"]
+    ).apply(sii_round)
+
     df["Renta_Exenta_Mensual"] = 0
 
     df["Monto_Ingreso_Mensual_Sin_Actualizar"] = (
         df["Renta_Total_Neta_Mensual"] + df["Rebaja_Zona_Extrema"]
-    )
+    ).apply(sii_round)
 
     df["Factor"] = df["MES_DJ"].map(FACTORES_ACTUALIZACION)
 
     df["Renta_Total_Neta_Actualizada"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Renta_Total_Neta_Mensual"]))) * row["Factor"]),
+        lambda row: sii_round(Decimal(str(int(row["Renta_Total_Neta_Mensual"]))) * row["Factor"]),
         axis=1,
     )
 
     df["IUSC_Actualizado"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["IUSC_Total_Mensual"]))) * row["Factor"]),
+        lambda row: sii_round(Decimal(str(int(row["IUSC_Total_Mensual"]))) * row["Factor"]),
         axis=1,
     )
 
     df["Mayor_Retencion_Actualizada"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Mayor_Retencion"]))) * row["Factor"]),
+        lambda row: sii_round(Decimal(str(int(row["Mayor_Retencion"]))) * row["Factor"]),
         axis=1,
     )
 
     df["Renta_No_Gravada_Actualizada"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Renta_No_Gravada_Mensual"]))) * row["Factor"]),
+        lambda row: sii_round(Decimal(str(int(row["Renta_No_Gravada_Mensual"]))) * row["Factor"]),
         axis=1,
     )
 
-    df["Renta_Exenta_Actualizada"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Renta_Exenta_Mensual"]))) * row["Factor"]),
-        axis=1,
-    )
+    df["Renta_Exenta_Actualizada"] = 0
 
     df["Rebaja_Zona_Extrema_Actualizada"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Rebaja_Zona_Extrema"]))) * row["Factor"]),
+        lambda row: sii_round(Decimal(str(int(row["Rebaja_Zona_Extrema"]))) * row["Factor"]),
         axis=1,
     )
 
     df["Prestamo_3_Actualizado"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Prestamo_3"]))) * row["Factor"]),
+        lambda row: sii_round(Decimal(str(int(row["Prestamo_3"]))) * row["Factor"]),
         axis=1,
     )
 
     df["Remuneracion_Imponible_Prev_Actualizada"] = df.apply(
-        lambda row: redondear_peso(Decimal(str(int(row["Total_Haberes_Imp_Trib"]))) * row["Factor"]),
+        lambda row: sii_round(Decimal(str(int(row["Total_Haberes_Imp_Trib"]))) * row["Factor"]),
         axis=1,
     )
 
-    df["Leyes_Sociales"] = df["Total_Cotizaciones_Trabajador"] + df["Total_Aportes_Empleador"]
+    df["Leyes_Sociales"] = (
+        df["Total_Cotizaciones_Trabajador"] + df["Total_Aportes_Empleador"]
+    ).apply(sii_round)
 
     if COL_FECHA_TERMINO in df.columns:
         df["Tiene_Termino"] = df[COL_FECHA_TERMINO].fillna("").astype(str).str.strip().apply(
@@ -514,41 +514,102 @@ def transformar_lre_mensual(df_lre):
         axis=1,
     )
 
-    return df[
-        [
-            "Rut_Trabajador",
-            "MES_DJ",
-            "Renta_Total_Neta_Mensual",
-            "Renta_Inferida_IUSC",
-            "Renta_LRE_Fallback",
-            "Metodo_Renta",
-            "Monto_Ingreso_Mensual_Sin_Actualizar",
-            "IUSC",
-            "IUSC_Indemnizaciones",
-            "IUSC_Total_Mensual",
-            "Mayor_Retencion",
-            "Renta_No_Gravada_Mensual",
-            "Renta_Exenta_Mensual",
-            "Rebaja_Zona_Extrema",
-            "Prestamo_3",
-            "Leyes_Sociales",
-            "Total_Haberes_Imp_Trib",
-            "Cotizaciones_Deducibles_Renta_Neta",
-            "Cot_Salud_Voluntaria",
-            "APVI_Mod_B",
-            "Renta_Total_Neta_Actualizada",
-            "IUSC_Actualizado",
-            "Mayor_Retencion_Actualizada",
-            "Renta_No_Gravada_Actualizada",
-            "Renta_Exenta_Actualizada",
-            "Rebaja_Zona_Extrema_Actualizada",
-            "Prestamo_3_Actualizado",
-            "Remuneracion_Imponible_Prev_Actualizada",
-            "Periodo_DJ",
-            "Horas_Semanales",
-            "ARCHIVO_ORIGEN",
-        ]
-    ].copy()
+    columnas_base = [
+        "Rut_Trabajador",
+        "MES_DJ",
+        "Renta_Total_Neta_Mensual",
+        "Renta_Inferida_IUSC",
+        "Renta_LRE_Fallback",
+        "Metodo_Renta",
+        "Monto_Ingreso_Mensual_Sin_Actualizar",
+        "IUSC",
+        "IUSC_Indemnizaciones",
+        "IUSC_Total_Mensual",
+        "Mayor_Retencion",
+        "Renta_No_Gravada_Mensual",
+        "Renta_Exenta_Mensual",
+        "Rebaja_Zona_Extrema",
+        "Prestamo_3",
+        "Leyes_Sociales",
+        "Total_Haberes_Imp_Trib",
+        "Cotizaciones_Deducibles_Renta_Neta",
+        "Cot_Salud_Voluntaria",
+        "APVI_Mod_B",
+        "Renta_Total_Neta_Actualizada",
+        "IUSC_Actualizado",
+        "Mayor_Retencion_Actualizada",
+        "Renta_No_Gravada_Actualizada",
+        "Renta_Exenta_Actualizada",
+        "Rebaja_Zona_Extrema_Actualizada",
+        "Prestamo_3_Actualizado",
+        "Remuneracion_Imponible_Prev_Actualizada",
+        "Periodo_DJ",
+        "Horas_Semanales",
+        "ARCHIVO_ORIGEN",
+    ]
+
+    df = df[columnas_base].copy()
+
+    # Si existen varias líneas por trabajador-mes, se consolidan primero a nivel trabajador-mes.
+    df_tm = df.groupby(["Rut_Trabajador", "MES_DJ"], as_index=False).agg({
+        "Renta_Total_Neta_Mensual": "sum",
+        "Renta_Inferida_IUSC": "sum",
+        "Renta_LRE_Fallback": "sum",
+        "Monto_Ingreso_Mensual_Sin_Actualizar": "sum",
+        "IUSC": "sum",
+        "IUSC_Indemnizaciones": "sum",
+        "IUSC_Total_Mensual": "sum",
+        "Mayor_Retencion": "sum",
+        "Renta_No_Gravada_Mensual": "sum",
+        "Renta_Exenta_Mensual": "sum",
+        "Rebaja_Zona_Extrema": "sum",
+        "Prestamo_3": "sum",
+        "Leyes_Sociales": "sum",
+        "Total_Haberes_Imp_Trib": "sum",
+        "Cotizaciones_Deducibles_Renta_Neta": "sum",
+        "Cot_Salud_Voluntaria": "sum",
+        "APVI_Mod_B": "sum",
+        "Renta_Total_Neta_Actualizada": "sum",
+        "IUSC_Actualizado": "sum",
+        "Mayor_Retencion_Actualizada": "sum",
+        "Renta_No_Gravada_Actualizada": "sum",
+        "Renta_Exenta_Actualizada": "sum",
+        "Rebaja_Zona_Extrema_Actualizada": "sum",
+        "Prestamo_3_Actualizado": "sum",
+        "Remuneracion_Imponible_Prev_Actualizada": "sum",
+        "Periodo_DJ": lambda x: next((v for v in x if v != ""), ""),
+        "Horas_Semanales": "max",
+        "ARCHIVO_ORIGEN": lambda x: " | ".join(sorted(set(map(str, x)))),
+        "Metodo_Renta": lambda x: " / ".join(sorted(set(map(str, x)))),
+    })
+
+    campos_redondeo = [
+        "Renta_Total_Neta_Mensual",
+        "Monto_Ingreso_Mensual_Sin_Actualizar",
+        "IUSC",
+        "IUSC_Indemnizaciones",
+        "IUSC_Total_Mensual",
+        "Mayor_Retencion",
+        "Renta_No_Gravada_Mensual",
+        "Renta_Exenta_Mensual",
+        "Rebaja_Zona_Extrema",
+        "Prestamo_3",
+        "Leyes_Sociales",
+        "Total_Haberes_Imp_Trib",
+        "Renta_Total_Neta_Actualizada",
+        "IUSC_Actualizado",
+        "Mayor_Retencion_Actualizada",
+        "Renta_No_Gravada_Actualizada",
+        "Renta_Exenta_Actualizada",
+        "Rebaja_Zona_Extrema_Actualizada",
+        "Prestamo_3_Actualizado",
+        "Remuneracion_Imponible_Prev_Actualizada",
+    ]
+
+    for col in campos_redondeo:
+        df_tm[col] = df_tm[col].apply(sii_round)
+
+    return df_tm.copy()
 
 
 def consolidar_dj_1887(df_mensual):
@@ -620,6 +681,7 @@ def consolidar_dj_1887(df_mensual):
             df_final[f"Ingreso_{mes}"]
             .fillna(0)
             .apply(limpiar_monto)
+            .apply(sii_round)
         )
 
     df_final["Rut_Orden"] = df_final["Rut_Trabajador"].apply(rut_a_numero)
