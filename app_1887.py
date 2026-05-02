@@ -400,18 +400,13 @@ def transformar_lre_mensual(df_lre):
     df["Total_Cotizaciones_Trabajador"] = obtener_serie_monto(df, COL_TOTAL_COTIZACIONES_TRAB)
     df["Total_Aportes_Empleador"] = obtener_serie_monto(df, COL_TOTAL_APORTES_EMPLEADOR)
 
-    df["Cotizaciones_Deducibles_Renta_Neta"] = (
-        df["Cot_AFP"]
-        + df["Cot_Salud"]
-        + df["Cot_Salud_Voluntaria"]
-        + df["Cot_AFC_Trab"]
-        + df["Cot_Trabajo_Pesado_Trab"]
-        + df["APVI_Mod_B"]
-    )
+    # El SII usa como base de cotizaciones deducibles el total consolidado informado en el LRE.
+    # Esto evita diferencias por sumar manualmente AFP, salud, AFC, APVI, etc.
+    df["Cotizaciones_Deducibles_Renta_Neta"] = df["Total_Cotizaciones_Trabajador"]
 
     df["Renta_LRE_Fallback"] = (
         df["Total_Haberes_Imp_Trib"] - df["Cotizaciones_Deducibles_Renta_Neta"]
-    ).apply(lambda x: max(int(x), 0))
+    ).apply(lambda x: max(sii_round(x), 0))
 
     df["IUSC_Total_Mensual"] = (
         df["IUSC"]
@@ -425,10 +420,17 @@ def transformar_lre_mensual(df_lre):
         axis=1,
     )
 
+    # Si existe impuesto por indemnización, no usamos la renta inferida desde IUSC
+    # como renta normal del mes, porque distorsiona el mes de pago/finiquito.
+    # En ese caso usamos la renta normal calculada desde LRE.
     df["Renta_Total_Neta_Mensual"] = df.apply(
-        lambda row: int(row["Renta_Inferida_IUSC"])
-        if pd.notna(row["Renta_Inferida_IUSC"]) and row["Renta_Inferida_IUSC"] is not None
-        else int(row["Renta_LRE_Fallback"]),
+        lambda row: int(row["Renta_LRE_Fallback"])
+        if int(row["IUSC_Indemnizaciones"]) > 0
+        else (
+            int(row["Renta_Inferida_IUSC"])
+            if pd.notna(row["Renta_Inferida_IUSC"]) and row["Renta_Inferida_IUSC"] is not None
+            else int(row["Renta_LRE_Fallback"])
+        ),
         axis=1,
     )
 
