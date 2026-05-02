@@ -6,24 +6,13 @@ import pandas as pd
 import streamlit as st
 
 
+# =====================================================
+# 1. PARÁMETROS GENERALES
+# =====================================================
+
 ANIO_COMERCIAL_DEFAULT = 2025
 
 MESES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"]
-
-MESES_NOMBRE = {
-    "ENE": "Enero",
-    "FEB": "Febrero",
-    "MAR": "Marzo",
-    "ABR": "Abril",
-    "MAY": "Mayo",
-    "JUN": "Junio",
-    "JUL": "Julio",
-    "AGO": "Agosto",
-    "SEP": "Septiembre",
-    "OCT": "Octubre",
-    "NOV": "Noviembre",
-    "DIC": "Diciembre",
-}
 
 NOMBRE_A_MES = {
     "enero": "ENE",
@@ -56,6 +45,11 @@ FACTORES_ACTUALIZACION = {
     "DIC": Decimal("1.000"),
 }
 
+
+# =====================================================
+# 2. COLUMNAS LRE
+# =====================================================
+
 COL_RUT = "Rut trabajador(1101)"
 COL_FECHA_TERMINO = "Fecha término de contrato(1103)"
 COL_JORNADA = "Código tipo de jornada(1107)"
@@ -66,19 +60,26 @@ COL_TOTAL_HABERES_NO_IMP_NO_TRIB = "Total haberes no imponibles y no tributables
 
 COL_AFP = "Cotización obligatoria previsional (AFP o IPS)(3141)"
 COL_SALUD = "Cotización obligatoria salud 7%(3143)"
+COL_SALUD_VOLUNTARIA = "Cotización voluntaria para salud(3144)"
 COL_AFC_TRAB = "Cotización AFC - trabajador(3151)"
 COL_TRABAJO_PESADO_TRAB = "Cotización adicional trabajo pesado - trabajador(3154)"
+COL_APVI_MOD_B = "Cotización APVi Mod B hasta UF50(3156)"
 
 COL_IUSC = "Impuesto retenido por remuneraciones(3161)"
+COL_IUSC_INDEMNIZACIONES = "Impuesto retenido por indemnizaciones(3162)"
+COL_MAYOR_RETENCION = "Mayor retención de impuestos solicitada por el trabajador(3163)"
 COL_IUSC_RELIQ = "Impuesto retenido por reliquidación remun. devengadas otros períodos(3164)"
 COL_DIF_RELIQ = "Diferencia impuesto reliquidación remun. devengadas en este período(3165)"
-COL_MAYOR_RETENCION = "Mayor retención de impuestos solicitada por el trabajador(3163)"
 COL_PRESTAMO_3 = "Retención préstamo clase media 2020 (Ley 21.252) (3166)"
 COL_REBAJA_ZONA = "Rebaja zona extrema DL 889 (3167)"
 
 COL_TOTAL_COTIZACIONES_TRAB = "Total descuentos por cotizaciones del trabajador(5341)"
 COL_TOTAL_APORTES_EMPLEADOR = "Total aportes empleador(5410)"
 
+
+# =====================================================
+# 3. SESSION STATE
+# =====================================================
 
 def inicializar_estado_1887():
     defaults = {
@@ -88,9 +89,10 @@ def inicializar_estado_1887():
         "df_dj_1887": None,
         "df_resumen_1887": None,
     }
-    for k, v in defaults.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
+
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
 
 def ir_a_paso(paso):
@@ -98,9 +100,13 @@ def ir_a_paso(paso):
     st.rerun()
 
 
+# =====================================================
+# 4. FUNCIONES AUXILIARES
+# =====================================================
+
 def formato_monto(valor):
     try:
-        return f"{int(valor):,}".replace(",", ".")
+        return f"{int(round(float(valor))):,}".replace(",", ".")
     except Exception:
         return "0"
 
@@ -112,6 +118,7 @@ def redondear_peso(valor):
 def normalizar_rut(rut):
     if pd.isna(rut):
         return ""
+
     rut = str(rut).strip().upper()
     rut = rut.replace(".", "").replace(" ", "")
     return rut
@@ -124,6 +131,7 @@ def validar_rut_basico(rut):
 
 def rut_a_numero(rut):
     rut = normalizar_rut(rut)
+
     try:
         return int(rut.split("-")[0])
     except Exception:
@@ -131,14 +139,64 @@ def rut_a_numero(rut):
 
 
 def limpiar_monto(valor):
+    """
+    Limpia montos del LRE sin multiplicar por 10 cuando vienen como float.
+    Ejemplos:
+    - 100658780.0 -> 100658780
+    - "100.658.780" -> 100658780
+    - "100,658,780" -> 100658780
+    - "" / nan -> 0
+    """
+
     if pd.isna(valor) or valor == "":
         return 0
+
+    if isinstance(valor, (int, float)):
+        try:
+            return int(round(float(valor)))
+        except Exception:
+            return 0
+
     texto = str(valor).strip()
-    texto = texto.replace("$", "").replace(".", "").replace(",", "").replace(" ", "")
+
     if texto in ["", "-", "nan", "NaN", "None"]:
         return 0
-    try:
+
+    texto = texto.replace("$", "").replace(" ", "")
+
+    if re.match(r"^-?\d+\.0+$", texto):
         return int(float(texto))
+
+    if "," in texto and "." in texto:
+        texto = texto.replace(".", "").replace(",", ".")
+        try:
+            return int(round(float(texto)))
+        except Exception:
+            return 0
+
+    if "." in texto and "," not in texto:
+        partes = texto.split(".")
+        if len(partes[-1]) == 3:
+            texto = texto.replace(".", "")
+        else:
+            try:
+                return int(round(float(texto)))
+            except Exception:
+                return 0
+
+    if "," in texto and "." not in texto:
+        partes = texto.split(",")
+        if len(partes[-1]) == 3:
+            texto = texto.replace(",", "")
+        else:
+            texto = texto.replace(",", ".")
+            try:
+                return int(round(float(texto)))
+            except Exception:
+                return 0
+
+    try:
+        return int(round(float(texto)))
     except Exception:
         return 0
 
@@ -146,14 +204,17 @@ def limpiar_monto(valor):
 def obtener_serie_monto(df, columna):
     if columna in df.columns:
         return df[columna].apply(limpiar_monto)
+
     return pd.Series([0] * len(df), index=df.index)
 
 
 def detectar_mes_desde_nombre(nombre_archivo):
     nombre = nombre_archivo.lower()
+
     for nombre_mes, codigo_mes in NOMBRE_A_MES.items():
         if nombre_mes in nombre:
             return codigo_mes
+
     return None
 
 
@@ -162,12 +223,19 @@ def leer_archivo_lre(file):
         try:
             file.seek(0)
             df = pd.read_csv(file, sep=";", encoding=enc)
+
             if len(df.columns) > 20:
                 return df
+
         except Exception:
             pass
+
     raise ValueError(f"No se pudo leer el archivo {file.name}.")
 
+
+# =====================================================
+# 5. CARGA Y VALIDACIÓN DE LRE
+# =====================================================
 
 def cargar_lre_desde_archivos(files):
     registros = []
@@ -175,6 +243,7 @@ def cargar_lre_desde_archivos(files):
 
     for file in files:
         mes = detectar_mes_desde_nombre(file.name)
+
         if mes is None:
             raise ValueError(f"No pude detectar el mes desde el nombre del archivo: {file.name}")
 
@@ -187,7 +256,10 @@ def cargar_lre_desde_archivos(files):
 
     meses_unicos = sorted(set(meses_detectados), key=lambda x: MESES.index(x))
     meses_faltantes = [m for m in MESES if m not in meses_unicos]
-    meses_duplicados = sorted([m for m in set(meses_detectados) if meses_detectados.count(m) > 1], key=lambda x: MESES.index(x))
+    meses_duplicados = sorted(
+        [m for m in set(meses_detectados) if meses_detectados.count(m) > 1],
+        key=lambda x: MESES.index(x),
+    )
 
     if meses_faltantes:
         raise ValueError("No se puede avanzar. Faltan LRE de los siguientes meses: " + ", ".join(meses_faltantes))
@@ -200,12 +272,23 @@ def cargar_lre_desde_archivos(files):
 
     df_total = pd.concat(registros, ignore_index=True)
 
-    faltantes = [c for c in [COL_RUT, COL_TOTAL_HABERES_IMP_TRIB, COL_IUSC] if c not in df_total.columns]
+    columnas_minimas = [
+        COL_RUT,
+        COL_TOTAL_HABERES_IMP_TRIB,
+        COL_IUSC,
+    ]
+
+    faltantes = [c for c in columnas_minimas if c not in df_total.columns]
+
     if faltantes:
         raise ValueError("El LRE no contiene columnas mínimas requeridas: " + ", ".join(faltantes))
 
     return df_total
 
+
+# =====================================================
+# 6. MOTOR DE CÁLCULO DJ 1887
+# =====================================================
 
 def transformar_lre_mensual(df_lre):
     df = df_lre.copy()
@@ -218,10 +301,13 @@ def transformar_lre_mensual(df_lre):
 
     df["Cot_AFP"] = obtener_serie_monto(df, COL_AFP)
     df["Cot_Salud"] = obtener_serie_monto(df, COL_SALUD)
+    df["Cot_Salud_Voluntaria"] = obtener_serie_monto(df, COL_SALUD_VOLUNTARIA)
     df["Cot_AFC_Trab"] = obtener_serie_monto(df, COL_AFC_TRAB)
     df["Cot_Trabajo_Pesado_Trab"] = obtener_serie_monto(df, COL_TRABAJO_PESADO_TRAB)
+    df["APVI_Mod_B"] = obtener_serie_monto(df, COL_APVI_MOD_B)
 
     df["IUSC"] = obtener_serie_monto(df, COL_IUSC)
+    df["IUSC_Indemnizaciones"] = obtener_serie_monto(df, COL_IUSC_INDEMNIZACIONES)
     df["IUSC_Reliquidacion"] = obtener_serie_monto(df, COL_IUSC_RELIQ)
     df["Diferencia_Reliquidacion"] = obtener_serie_monto(df, COL_DIF_RELIQ)
     df["Mayor_Retencion"] = obtener_serie_monto(df, COL_MAYOR_RETENCION)
@@ -231,17 +317,38 @@ def transformar_lre_mensual(df_lre):
     df["Total_Cotizaciones_Trabajador"] = obtener_serie_monto(df, COL_TOTAL_COTIZACIONES_TRAB)
     df["Total_Aportes_Empleador"] = obtener_serie_monto(df, COL_TOTAL_APORTES_EMPLEADOR)
 
-    df["Cotizaciones_Obligatorias_Para_DJ"] = (
-        df["Cot_AFP"] + df["Cot_Salud"] + df["Cot_AFC_Trab"] + df["Cot_Trabajo_Pesado_Trab"]
+    # Fórmula ajustada según diferencias detectadas contra SII:
+    # Renta neta = haberes imponibles y tributables
+    # - cotizaciones previsionales/deducibles relevantes.
+    # Se agregan APVI Mod B y salud voluntaria, que explicaban parte relevante de la sobredeclaración.
+    df["Cotizaciones_Deducibles_Renta_Neta"] = (
+        df["Cot_AFP"]
+        + df["Cot_Salud"]
+        + df["Cot_Salud_Voluntaria"]
+        + df["Cot_AFC_Trab"]
+        + df["Cot_Trabajo_Pesado_Trab"]
+        + df["APVI_Mod_B"]
     )
 
-    df["Renta_Total_Neta_Mensual"] = df["Total_Haberes_Imp_Trib"] - df["Cotizaciones_Obligatorias_Para_DJ"]
+    df["Renta_Total_Neta_Mensual"] = (
+        df["Total_Haberes_Imp_Trib"] - df["Cotizaciones_Deducibles_Renta_Neta"]
+    )
+
     df["Renta_Total_Neta_Mensual"] = df["Renta_Total_Neta_Mensual"].apply(lambda x: max(int(x), 0))
 
     df["Renta_No_Gravada_Mensual"] = df["Haberes_Imp_No_Trib"] + df["Haberes_No_Imp_No_Trib"]
     df["Renta_Exenta_Mensual"] = 0
 
-    df["Monto_Ingreso_Mensual_Sin_Actualizar"] = df["Renta_Total_Neta_Mensual"] + df["Rebaja_Zona_Extrema"]
+    df["Monto_Ingreso_Mensual_Sin_Actualizar"] = (
+        df["Renta_Total_Neta_Mensual"] + df["Rebaja_Zona_Extrema"]
+    )
+
+    df["IUSC_Total_Mensual"] = (
+        df["IUSC"]
+        + df["IUSC_Indemnizaciones"]
+        + df["IUSC_Reliquidacion"]
+        + df["Diferencia_Reliquidacion"]
+    )
 
     df["Factor"] = df["MES_DJ"].map(FACTORES_ACTUALIZACION)
 
@@ -251,9 +358,7 @@ def transformar_lre_mensual(df_lre):
     )
 
     df["IUSC_Actualizado"] = df.apply(
-        lambda row: redondear_peso(
-            Decimal(str(int(row["IUSC"] + row["IUSC_Reliquidacion"] + row["Diferencia_Reliquidacion"]))) * row["Factor"]
-        ),
+        lambda row: redondear_peso(Decimal(str(int(row["IUSC_Total_Mensual"]))) * row["Factor"]),
         axis=1,
     )
 
@@ -282,11 +387,15 @@ def transformar_lre_mensual(df_lre):
         axis=1,
     )
 
+    # Base previsional: se mantiene como línea informativa para el resumen.
+    # Se podrá recalibrar en detalle en la siguiente iteración si aún hay diferencia.
     df["Remuneracion_Imponible_Prev_Actualizada"] = df.apply(
         lambda row: redondear_peso(Decimal(str(int(row["Total_Haberes_Imp_Trib"]))) * row["Factor"]),
         axis=1,
     )
 
+    # Leyes sociales: se mantiene usando columnas totales del LRE.
+    # Se deja separada para comparar contra SII en etapa posterior.
     df["Leyes_Sociales"] = df["Total_Cotizaciones_Trabajador"] + df["Total_Aportes_Empleador"]
 
     if COL_FECHA_TERMINO in df.columns:
@@ -310,17 +419,34 @@ def transformar_lre_mensual(df_lre):
 
     return df[
         [
-            "Rut_Trabajador", "MES_DJ",
-            "Renta_Total_Neta_Mensual", "Monto_Ingreso_Mensual_Sin_Actualizar",
-            "IUSC", "Mayor_Retencion",
-            "Renta_No_Gravada_Mensual", "Renta_Exenta_Mensual",
-            "Rebaja_Zona_Extrema", "Prestamo_3", "Leyes_Sociales",
+            "Rut_Trabajador",
+            "MES_DJ",
+            "Renta_Total_Neta_Mensual",
+            "Monto_Ingreso_Mensual_Sin_Actualizar",
+            "IUSC",
+            "IUSC_Indemnizaciones",
+            "IUSC_Total_Mensual",
+            "Mayor_Retencion",
+            "Renta_No_Gravada_Mensual",
+            "Renta_Exenta_Mensual",
+            "Rebaja_Zona_Extrema",
+            "Prestamo_3",
+            "Leyes_Sociales",
             "Total_Haberes_Imp_Trib",
-            "Renta_Total_Neta_Actualizada", "IUSC_Actualizado",
-            "Mayor_Retencion_Actualizada", "Renta_No_Gravada_Actualizada",
-            "Renta_Exenta_Actualizada", "Rebaja_Zona_Extrema_Actualizada",
-            "Prestamo_3_Actualizado", "Remuneracion_Imponible_Prev_Actualizada",
-            "Periodo_DJ", "Horas_Semanales", "ARCHIVO_ORIGEN",
+            "Cotizaciones_Deducibles_Renta_Neta",
+            "Cot_Salud_Voluntaria",
+            "APVI_Mod_B",
+            "Renta_Total_Neta_Actualizada",
+            "IUSC_Actualizado",
+            "Mayor_Retencion_Actualizada",
+            "Renta_No_Gravada_Actualizada",
+            "Renta_Exenta_Actualizada",
+            "Rebaja_Zona_Extrema_Actualizada",
+            "Prestamo_3_Actualizado",
+            "Remuneracion_Imponible_Prev_Actualizada",
+            "Periodo_DJ",
+            "Horas_Semanales",
+            "ARCHIVO_ORIGEN",
         ]
     ].copy()
 
@@ -337,7 +463,7 @@ def consolidar_dj_1887(df_mensual):
         "Rebaja_Zona_Extrema_Actualizada": "sum",
         "Prestamo_3_Actualizado": "sum",
         "Renta_Total_Neta_Mensual": "sum",
-        "IUSC": "sum",
+        "IUSC_Total_Mensual": "sum",
         "Renta_No_Gravada_Mensual": "sum",
         "Renta_Exenta_Mensual": "sum",
         "Rebaja_Zona_Extrema": "sum",
@@ -364,21 +490,38 @@ def consolidar_dj_1887(df_mensual):
     for mes in MESES:
         if mes not in pivot_periodos.columns:
             pivot_periodos[mes] = ""
+
         if mes not in pivot_ingresos.columns:
             pivot_ingresos[mes] = 0
 
     pivot_ingresos = pivot_ingresos.rename(columns={m: f"Ingreso_{m}" for m in MESES})
 
-    df_final = agrupado.merge(pivot_periodos[["Rut_Trabajador"] + MESES], on="Rut_Trabajador", how="left")
+    df_final = agrupado.merge(
+        pivot_periodos[["Rut_Trabajador"] + MESES],
+        on="Rut_Trabajador",
+        how="left",
+    )
+
     df_final = df_final.merge(
         pivot_ingresos[["Rut_Trabajador"] + [f"Ingreso_{m}" for m in MESES]],
         on="Rut_Trabajador",
         how="left",
     )
 
+    # FIX NAN: meses sin renta deben mostrarse en blanco.
     for mes in MESES:
-        df_final[mes] = df_final[mes].fillna("").astype(str).replace(["nan", "NaN", "None"], "")
-        df_final[f"Ingreso_{mes}"] = df_final[f"Ingreso_{mes}"].fillna(0).apply(limpiar_monto)
+        df_final[mes] = (
+            df_final[mes]
+            .fillna("")
+            .astype(str)
+            .replace(["nan", "NaN", "None"], "")
+        )
+
+        df_final[f"Ingreso_{mes}"] = (
+            df_final[f"Ingreso_{mes}"]
+            .fillna(0)
+            .apply(limpiar_monto)
+        )
 
     df_final["Rut_Orden"] = df_final["Rut_Trabajador"].apply(rut_a_numero)
     df_final = df_final.sort_values("Rut_Orden").drop(columns=["Rut_Orden"]).reset_index(drop=True)
@@ -389,18 +532,27 @@ def consolidar_dj_1887(df_mensual):
 
     return df_final[
         [
-            "N°", "Rut_Trabajador",
-            "Renta_Total_Neta_Actualizada", "IUSC_Actualizado",
-            "Mayor_Retencion_Actualizada", "Renta_No_Gravada_Actualizada",
-            "Renta_Exenta_Actualizada", "Rebaja_Zona_Extrema_Actualizada",
+            "N°",
+            "Rut_Trabajador",
+            "Renta_Total_Neta_Actualizada",
+            "IUSC_Actualizado",
+            "Mayor_Retencion_Actualizada",
+            "Renta_No_Gravada_Actualizada",
+            "Renta_Exenta_Actualizada",
+            "Rebaja_Zona_Extrema_Actualizada",
             "Prestamo_3_Actualizado",
         ] + MESES + [
             "Número Certificado",
         ] + [f"Ingreso_{m}" for m in MESES] + [
-            "Horas_Semanales", "ESTADO",
-            "Renta_Total_Neta_Mensual", "IUSC",
-            "Renta_No_Gravada_Mensual", "Renta_Exenta_Mensual",
-            "Rebaja_Zona_Extrema", "Prestamo_3", "Leyes_Sociales",
+            "Horas_Semanales",
+            "ESTADO",
+            "Renta_Total_Neta_Mensual",
+            "IUSC_Total_Mensual",
+            "Renta_No_Gravada_Mensual",
+            "Renta_Exenta_Mensual",
+            "Rebaja_Zona_Extrema",
+            "Prestamo_3",
+            "Leyes_Sociales",
             "Remuneracion_Imponible_Prev_Actualizada",
         ]
     ].copy()
@@ -417,7 +569,7 @@ def generar_resumen_1887(df_dj):
         "Rebaja Zonas Extremas Actualizada": df_dj["Rebaja_Zona_Extrema_Actualizada"].sum(),
         "3% Préstamo Tasa 0% Actualizado": df_dj["Prestamo_3_Actualizado"].sum(),
         "Renta Total Neta Pagada Sin Actualizar": df_dj["Renta_Total_Neta_Mensual"].sum(),
-        "IUSC Retenido Sin Actualizar": df_dj["IUSC"].sum(),
+        "IUSC Retenido Sin Actualizar": df_dj["IUSC_Total_Mensual"].sum(),
         "Renta No Gravada Sin Actualizar": df_dj["Renta_No_Gravada_Mensual"].sum(),
         "Renta Exenta Sin Actualizar": df_dj["Renta_Exenta_Mensual"].sum(),
         "Rebaja Zona Extrema Sin Actualizar": df_dj["Rebaja_Zona_Extrema"].sum(),
@@ -429,23 +581,35 @@ def generar_resumen_1887(df_dj):
     for mes in MESES:
         resumen[f"Ingreso Mensual {mes} Sin Actualizar"] = df_dj[f"Ingreso_{mes}"].sum()
 
-    return pd.DataFrame({"Campo": list(resumen.keys()), "Monto": list(resumen.values())})
+    return pd.DataFrame({
+        "Campo": list(resumen.keys()),
+        "Monto": list(resumen.values()),
+    })
 
+
+# =====================================================
+# 7. EXPORTACIÓN
+# =====================================================
 
 def convertir_a_excel_1887(df_dj, df_resumen, df_mensual):
     output = BytesIO()
+
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df_dj.to_excel(writer, index=False, sheet_name="DJ_1887")
         df_resumen.to_excel(writer, index=False, sheet_name="Resumen_1887")
         df_mensual.to_excel(writer, index=False, sheet_name="Base_LRE_Mensual")
+
     output.seek(0)
     return output.getvalue()
 
 
+# =====================================================
+# 8. HTML - TABLAS TIPO SII
+# =====================================================
+
 def tabla_html_resumen_1887(df_resumen):
     data = {row["Campo"]: row["Monto"] for _, row in df_resumen.iterrows()}
     anio_40 = st.session_state.datos_declarante_1887.get("anio_40_horas", 2028)
-
     ingresos = {m: data.get(f"Ingreso Mensual {m} Sin Actualizar", 0) for m in MESES}
 
     return f"""
@@ -637,17 +801,24 @@ def tabla_html_dj_1887(df_dj):
 <td>{row["ESTADO"]}</td>
 </tr>
 """
+
     html += "</table>"
     return html
 
 
+# =====================================================
+# 9. PANTALLAS
+# =====================================================
+
 def pantalla_bienvenida():
     st.title("👥 Asistente DJ 1887 - Remuneraciones")
+
     st.markdown("""
 ### Automatiza la preparación de la DJ 1887 desde el Libro de Remuneraciones Electrónico
 
 Este módulo consolida los **12 archivos mensuales del LRE**, valida que no falte ningún mes, calcula los montos anuales actualizados por trabajador y genera una salida tipo SII.
 """)
+
     if st.button("Comenzar"):
         ir_a_paso(1)
 
@@ -699,6 +870,7 @@ def pantalla_paso_1():
                 "anio_tributario": int(anio_comercial) + 1,
                 "anio_40_horas": int(anio_40_horas),
             }
+
             ir_a_paso(2)
 
 
@@ -722,6 +894,7 @@ Si falta un mes o existe un mes duplicado, el sistema no permitirá avanzar.
 
     if files:
         st.write(f"Archivos cargados: {len(files)}")
+
         with st.expander("Ver archivos cargados"):
             for file in files:
                 mes = detectar_mes_desde_nombre(file.name)
@@ -768,6 +941,7 @@ def pantalla_paso_3():
     st.success("DJ 1887 generada correctamente.")
 
     st.markdown("## Detalle consulta declaración jurada")
+
     st.markdown(f"""
 **Nombre o Razón Social:** {datos.get("nombre_declarante", "")}  
 **RUT Empresa Declarante:** {datos.get("rut_declarante", "")}  
@@ -815,6 +989,10 @@ def pantalla_paso_3():
             st.rerun()
 
 
+# =====================================================
+# 10. FUNCIÓN PRINCIPAL
+# =====================================================
+
 def run_1887():
     inicializar_estado_1887()
 
@@ -822,10 +1000,13 @@ def run_1887():
 
     if paso == 0:
         pantalla_bienvenida()
+
     elif paso == 1:
         pantalla_paso_1()
+
     elif paso == 2:
         pantalla_paso_2()
+
     elif paso == 3:
         pantalla_paso_3()
 
