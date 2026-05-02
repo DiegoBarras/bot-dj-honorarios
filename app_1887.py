@@ -45,6 +45,32 @@ FACTORES_ACTUALIZACION = {
     "DIC": Decimal("1.000"),
 }
 
+UTM_2025 = {
+    "ENE": 67429,
+    "FEB": 67294,
+    "MAR": 68034,
+    "ABR": 68306,
+    "MAY": 68648,
+    "JUN": 68785,
+    "JUL": 68923,
+    "AGO": 68647,
+    "SEP": 69265,
+    "OCT": 69265,
+    "NOV": 69542,
+    "DIC": 69542,
+}
+
+TRAMOS_IUSC_UTM = [
+    {"desde": Decimal("0"), "hasta": Decimal("13.5"), "factor": Decimal("0"), "rebaja": Decimal("0")},
+    {"desde": Decimal("13.5"), "hasta": Decimal("30"), "factor": Decimal("0.04"), "rebaja": Decimal("0.54")},
+    {"desde": Decimal("30"), "hasta": Decimal("50"), "factor": Decimal("0.08"), "rebaja": Decimal("1.74")},
+    {"desde": Decimal("50"), "hasta": Decimal("70"), "factor": Decimal("0.135"), "rebaja": Decimal("4.49")},
+    {"desde": Decimal("70"), "hasta": Decimal("90"), "factor": Decimal("0.23"), "rebaja": Decimal("11.14")},
+    {"desde": Decimal("90"), "hasta": Decimal("120"), "factor": Decimal("0.304"), "rebaja": Decimal("17.80")},
+    {"desde": Decimal("120"), "hasta": Decimal("150"), "factor": Decimal("0.35"), "rebaja": Decimal("23.32")},
+    {"desde": Decimal("150"), "hasta": None, "factor": Decimal("0.40"), "rebaja": Decimal("30.82")},
+]
+
 
 # =====================================================
 # 2. COLUMNAS LRE
@@ -131,7 +157,6 @@ def validar_rut_basico(rut):
 
 def rut_a_numero(rut):
     rut = normalizar_rut(rut)
-
     try:
         return int(rut.split("-")[0])
     except Exception:
@@ -139,15 +164,6 @@ def rut_a_numero(rut):
 
 
 def limpiar_monto(valor):
-    """
-    Limpia montos del LRE sin multiplicar por 10 cuando vienen como float.
-    Ejemplos:
-    - 100658780.0 -> 100658780
-    - "100.658.780" -> 100658780
-    - "100,658,780" -> 100658780
-    - "" / nan -> 0
-    """
-
     if pd.isna(valor) or valor == "":
         return 0
 
@@ -234,8 +250,38 @@ def leer_archivo_lre(file):
 
 
 # =====================================================
-# 5. CARGA Y VALIDACIÓN DE LRE
+# 5. VALIDACIÓN DE MESES LRE
 # =====================================================
+
+def validar_meses_lre(meses_detectados):
+    meses_unicos = sorted(set(meses_detectados), key=lambda x: MESES.index(x))
+
+    meses_duplicados = sorted(
+        [m for m in set(meses_detectados) if meses_detectados.count(m) > 1],
+        key=lambda x: MESES.index(x),
+    )
+
+    if meses_duplicados:
+        raise ValueError("No se puede avanzar. Existen meses duplicados: " + ", ".join(meses_duplicados))
+
+    if not meses_unicos:
+        raise ValueError("No se detectaron meses válidos en los archivos cargados.")
+
+    primer_mes = meses_unicos[0]
+    idx_inicio = MESES.index(primer_mes)
+
+    meses_requeridos = MESES[idx_inicio:]
+    meses_faltantes = [m for m in meses_requeridos if m not in meses_unicos]
+
+    if meses_faltantes:
+        raise ValueError(
+            f"No se puede avanzar. Detecté que el primer LRE cargado corresponde a {primer_mes}. "
+            f"Desde ese mes deben cargarse todos los LRE hasta diciembre. "
+            f"Faltan: {', '.join(meses_faltantes)}"
+        )
+
+    return meses_unicos
+
 
 def cargar_lre_desde_archivos(files):
     registros = []
@@ -254,21 +300,7 @@ def cargar_lre_desde_archivos(files):
         registros.append(df)
         meses_detectados.append(mes)
 
-    meses_unicos = sorted(set(meses_detectados), key=lambda x: MESES.index(x))
-    meses_faltantes = [m for m in MESES if m not in meses_unicos]
-    meses_duplicados = sorted(
-        [m for m in set(meses_detectados) if meses_detectados.count(m) > 1],
-        key=lambda x: MESES.index(x),
-    )
-
-    if meses_faltantes:
-        raise ValueError("No se puede avanzar. Faltan LRE de los siguientes meses: " + ", ".join(meses_faltantes))
-
-    if meses_duplicados:
-        raise ValueError("No se puede avanzar. Existen meses duplicados: " + ", ".join(meses_duplicados))
-
-    if len(meses_unicos) != 12:
-        raise ValueError("No se puede avanzar. Debes cargar exactamente los 12 meses del LRE.")
+    validar_meses_lre(meses_detectados)
 
     df_total = pd.concat(registros, ignore_index=True)
 
@@ -287,7 +319,61 @@ def cargar_lre_desde_archivos(files):
 
 
 # =====================================================
-# 6. MOTOR DE CÁLCULO DJ 1887
+# 6. INGENIERÍA INVERSA IUSC
+# =====================================================
+
+def calcular_iusc_desde_base(base_pesos, mes):
+    utm = Decimal(str(UTM_2025[mes]))
+    base = Decimal(str(base_pesos))
+
+    for tramo in TRAMOS_IUSC_UTM:
+        desde = tramo["desde"] * utm
+        hasta = tramo["hasta"] * utm if tramo["hasta"] is not None else None
+
+        if base > desde and (hasta is None or base <= hasta):
+            if tramo["factor"] == 0:
+                return 0
+
+            impuesto = base * tramo["factor"] - tramo["rebaja"] * utm
+            return max(redondear_peso(impuesto), 0)
+
+    return 0
+
+
+def inferir_renta_desde_iusc(iusc_mensual, mes):
+    """
+    Reconstruye la renta líquida imponible mensual desde el IUSC retenido.
+    Si el IUSC es 0, no existe una única base posible, por lo que se retorna None
+    y el motor usa la renta calculada desde LRE como fallback.
+    """
+
+    impuesto = Decimal(str(int(iusc_mensual)))
+
+    if impuesto <= 0:
+        return None
+
+    utm = Decimal(str(UTM_2025[mes]))
+
+    for tramo in TRAMOS_IUSC_UTM:
+        if tramo["factor"] == 0:
+            continue
+
+        factor = tramo["factor"]
+        rebaja_pesos = tramo["rebaja"] * utm
+
+        base = (impuesto + rebaja_pesos) / factor
+
+        desde = tramo["desde"] * utm
+        hasta = tramo["hasta"] * utm if tramo["hasta"] is not None else None
+
+        if base > desde and (hasta is None or base <= hasta):
+            return redondear_peso(base)
+
+    return None
+
+
+# =====================================================
+# 7. MOTOR DE CÁLCULO DJ 1887
 # =====================================================
 
 def transformar_lre_mensual(df_lre):
@@ -317,10 +403,6 @@ def transformar_lre_mensual(df_lre):
     df["Total_Cotizaciones_Trabajador"] = obtener_serie_monto(df, COL_TOTAL_COTIZACIONES_TRAB)
     df["Total_Aportes_Empleador"] = obtener_serie_monto(df, COL_TOTAL_APORTES_EMPLEADOR)
 
-    # Fórmula ajustada según diferencias detectadas contra SII:
-    # Renta neta = haberes imponibles y tributables
-    # - cotizaciones previsionales/deducibles relevantes.
-    # Se agregan APVI Mod B y salud voluntaria, que explicaban parte relevante de la sobredeclaración.
     df["Cotizaciones_Deducibles_Renta_Neta"] = (
         df["Cot_AFP"]
         + df["Cot_Salud"]
@@ -330,24 +412,43 @@ def transformar_lre_mensual(df_lre):
         + df["APVI_Mod_B"]
     )
 
-    df["Renta_Total_Neta_Mensual"] = (
+    df["Renta_LRE_Fallback"] = (
         df["Total_Haberes_Imp_Trib"] - df["Cotizaciones_Deducibles_Renta_Neta"]
     )
 
-    df["Renta_Total_Neta_Mensual"] = df["Renta_Total_Neta_Mensual"].apply(lambda x: max(int(x), 0))
-
-    df["Renta_No_Gravada_Mensual"] = df["Haberes_Imp_No_Trib"] + df["Haberes_No_Imp_No_Trib"]
-    df["Renta_Exenta_Mensual"] = 0
-
-    df["Monto_Ingreso_Mensual_Sin_Actualizar"] = (
-        df["Renta_Total_Neta_Mensual"] + df["Rebaja_Zona_Extrema"]
-    )
+    df["Renta_LRE_Fallback"] = df["Renta_LRE_Fallback"].apply(lambda x: max(int(x), 0))
 
     df["IUSC_Total_Mensual"] = (
         df["IUSC"]
         + df["IUSC_Indemnizaciones"]
         + df["IUSC_Reliquidacion"]
         + df["Diferencia_Reliquidacion"]
+    )
+
+    df["Renta_Inferida_IUSC"] = df.apply(
+        lambda row: inferir_renta_desde_iusc(row["IUSC_Total_Mensual"], row["MES_DJ"]),
+        axis=1,
+    )
+
+    df["Renta_Total_Neta_Mensual"] = df.apply(
+        lambda row: int(row["Renta_Inferida_IUSC"])
+        if pd.notna(row["Renta_Inferida_IUSC"]) and row["Renta_Inferida_IUSC"] is not None
+        else int(row["Renta_LRE_Fallback"]),
+        axis=1,
+    )
+
+    df["Metodo_Renta"] = df.apply(
+        lambda row: "Inferida desde IUSC"
+        if pd.notna(row["Renta_Inferida_IUSC"]) and row["Renta_Inferida_IUSC"] is not None
+        else "Fallback LRE",
+        axis=1,
+    )
+
+    df["Renta_No_Gravada_Mensual"] = df["Haberes_Imp_No_Trib"] + df["Haberes_No_Imp_No_Trib"]
+    df["Renta_Exenta_Mensual"] = 0
+
+    df["Monto_Ingreso_Mensual_Sin_Actualizar"] = (
+        df["Renta_Total_Neta_Mensual"] + df["Rebaja_Zona_Extrema"]
     )
 
     df["Factor"] = df["MES_DJ"].map(FACTORES_ACTUALIZACION)
@@ -387,15 +488,11 @@ def transformar_lre_mensual(df_lre):
         axis=1,
     )
 
-    # Base previsional: se mantiene como línea informativa para el resumen.
-    # Se podrá recalibrar en detalle en la siguiente iteración si aún hay diferencia.
     df["Remuneracion_Imponible_Prev_Actualizada"] = df.apply(
         lambda row: redondear_peso(Decimal(str(int(row["Total_Haberes_Imp_Trib"]))) * row["Factor"]),
         axis=1,
     )
 
-    # Leyes sociales: se mantiene usando columnas totales del LRE.
-    # Se deja separada para comparar contra SII en etapa posterior.
     df["Leyes_Sociales"] = df["Total_Cotizaciones_Trabajador"] + df["Total_Aportes_Empleador"]
 
     if COL_FECHA_TERMINO in df.columns:
@@ -422,6 +519,9 @@ def transformar_lre_mensual(df_lre):
             "Rut_Trabajador",
             "MES_DJ",
             "Renta_Total_Neta_Mensual",
+            "Renta_Inferida_IUSC",
+            "Renta_LRE_Fallback",
+            "Metodo_Renta",
             "Monto_Ingreso_Mensual_Sin_Actualizar",
             "IUSC",
             "IUSC_Indemnizaciones",
@@ -508,7 +608,6 @@ def consolidar_dj_1887(df_mensual):
         how="left",
     )
 
-    # FIX NAN: meses sin renta deben mostrarse en blanco.
     for mes in MESES:
         df_final[mes] = (
             df_final[mes]
@@ -588,7 +687,7 @@ def generar_resumen_1887(df_dj):
 
 
 # =====================================================
-# 7. EXPORTACIÓN
+# 8. EXPORTACIÓN
 # =====================================================
 
 def convertir_a_excel_1887(df_dj, df_resumen, df_mensual):
@@ -604,7 +703,7 @@ def convertir_a_excel_1887(df_dj, df_resumen, df_mensual):
 
 
 # =====================================================
-# 8. HTML - TABLAS TIPO SII
+# 9. HTML - TABLAS TIPO SII
 # =====================================================
 
 def tabla_html_resumen_1887(df_resumen):
@@ -807,7 +906,7 @@ def tabla_html_dj_1887(df_dj):
 
 
 # =====================================================
-# 9. PANTALLAS
+# 10. PANTALLAS
 # =====================================================
 
 def pantalla_bienvenida():
@@ -816,7 +915,7 @@ def pantalla_bienvenida():
     st.markdown("""
 ### Automatiza la preparación de la DJ 1887 desde el Libro de Remuneraciones Electrónico
 
-Este módulo consolida los **12 archivos mensuales del LRE**, valida que no falte ningún mes, calcula los montos anuales actualizados por trabajador y genera una salida tipo SII.
+Este módulo consolida los archivos mensuales del LRE, valida continuidad desde el primer mes cargado hasta diciembre, calcula los montos anuales actualizados por trabajador y genera una salida tipo SII.
 """)
 
     if st.button("Comenzar"):
@@ -881,13 +980,14 @@ def pantalla_paso_2():
     anio_comercial = datos.get("anio_comercial", ANIO_COMERCIAL_DEFAULT)
 
     st.markdown(f"""
-Carga los **12 archivos CSV del Libro de Remuneraciones Electrónico** correspondientes al año comercial **{anio_comercial}**.
+Carga los archivos CSV del Libro de Remuneraciones Electrónico correspondientes al año comercial **{anio_comercial}**.
 
-Si falta un mes o existe un mes duplicado, el sistema no permitirá avanzar.
+No es obligatorio cargar enero si la empresa aún no tenía trabajadores.  
+El sistema detectará el primer mes cargado y exigirá continuidad desde ese mes hasta diciembre.
 """)
 
     files = st.file_uploader(
-        f"Sube los 12 archivos LRE CSV del año comercial {anio_comercial}",
+        f"Sube los archivos LRE CSV del año comercial {anio_comercial}",
         type=["csv"],
         accept_multiple_files=True,
     )
@@ -903,7 +1003,7 @@ Si falta un mes o existe un mes duplicado, el sistema no permitirá avanzar.
     if st.button("Validar LRE"):
         try:
             if not files:
-                st.error("Debes cargar los 12 archivos LRE en formato CSV.")
+                st.error("Debes cargar al menos un archivo LRE en formato CSV.")
                 return
 
             df_lre = cargar_lre_desde_archivos(files)
@@ -990,7 +1090,7 @@ def pantalla_paso_3():
 
 
 # =====================================================
-# 10. FUNCIÓN PRINCIPAL
+# 11. FUNCIÓN PRINCIPAL
 # =====================================================
 
 def run_1887():
